@@ -255,8 +255,18 @@ def consultar_catalogos(mtime_ab, mtime_pr):
     grupos    = ca.execute("SELECT DISTINCT grupo FROM lineas WHERE grupo IS NOT NULL ORDER BY grupo").df()["grupo"].tolist()
     rubros    = ca.execute("SELECT DISTINCT rubro FROM lineas WHERE rubro IS NOT NULL ORDER BY rubro").df()["rubro"].tolist()
     centrales = ca.execute("SELECT DISTINCT central_mayorista FROM lineas WHERE central_mayorista IS NOT NULL ORDER BY central_mayorista").df()["central_mayorista"].tolist()
-    deptos    = ca.execute("SELECT DISTINCT departamento_origen FROM lineas WHERE departamento_origen IS NOT NULL ORDER BY departamento_origen").df()["departamento_origen"].tolist()
-    rango     = ca.execute("SELECT MIN(fecha_mes) AS fmin, MAX(fecha_mes) AS fmax FROM lineas").df()
+    deptos_raw = ca.execute("""
+        SELECT DISTINCT
+            CASE
+                WHEN UPPER(TRIM(departamento_origen)) IN ('BOGOTÁ, D. C.','BOGOTA, D.C.','BOGOTÁ D.C.','BOGOTA D.C.','BOGOTA','BOGOTÁ DC','BOGOTA DC')
+                THEN 'BOGOTÁ, D.C.'
+                ELSE departamento_origen
+            END AS departamento_origen
+        FROM lineas WHERE departamento_origen IS NOT NULL
+        ORDER BY 1
+    """).df()["departamento_origen"].tolist()
+    deptos = list(dict.fromkeys(deptos_raw))  # dedup manteniendo orden
+    rango     = ca.execute("SELECT MIN(fecha_mes) AS fmin, MAX(fecha_mes) AS fmax FROM lineas WHERE fecha_mes <= '2026-03-01'").df()
     fecha_min = pd.to_datetime(rango.loc[0,"fmin"]).date()
     fecha_max = pd.to_datetime(rango.loc[0,"fmax"]).date()
     return grupos, rubros, centrales, deptos, fecha_min, fecha_max
@@ -265,8 +275,14 @@ def consultar_catalogos(mtime_ab, mtime_pr):
 # WHERE BUILDER
 # =========================================================
 
+BOGOTA_VARIANTES = {
+    'BOGOTÁ, D. C.','BOGOTA, D.C.','BOGOTÁ D.C.','BOGOTA D.C.',
+    'BOGOTA','BOGOTÁ DC','BOGOTA DC','BOGOTÁ, D.C.','BOGOTÁ'
+}
+
 def build_where_ab(fecha_ini, fecha_fin, semestre, grupo, rubro, centrales, deptos):
-    c, p = ["fecha_mes BETWEEN ? AND ?"], [fecha_ini.isoformat(), fecha_fin.isoformat()]
+    c = ["fecha_mes BETWEEN ? AND ?", "fecha_mes <= '2026-03-01'"]
+    p = [fecha_ini.isoformat(), fecha_fin.isoformat()]
     if semestre == "Primer semestre":    c.append("mes BETWEEN 1 AND 6")
     elif semestre == "Segundo semestre": c.append("mes BETWEEN 7 AND 12")
     if rubro and rubro != "Todos":
@@ -276,11 +292,19 @@ def build_where_ab(fecha_ini, fecha_fin, semestre, grupo, rubro, centrales, dept
     if centrales:
         c.append(f"central_mayorista IN ({','.join(['?']*len(centrales))})"); p.extend(list(centrales))
     if deptos:
-        c.append(f"departamento_origen IN ({','.join(['?']*len(deptos))})"); p.extend(list(deptos))
+        deptos_norm = []
+        for d in deptos:
+            if 'BOGOT' in d.upper():
+                deptos_norm.extend(list(BOGOTA_VARIANTES))
+            else:
+                deptos_norm.append(d)
+        deptos_norm = list(set(deptos_norm))
+        c.append(f"departamento_origen IN ({','.join(['?']*len(deptos_norm))})"); p.extend(deptos_norm)
     return " AND ".join(c), p
 
 def build_where_pr(fecha_ini, fecha_fin, semestre, grupo, rubro, centrales):
-    c, p = ["fecha BETWEEN ? AND ?"], [fecha_ini.isoformat(), fecha_fin.isoformat()]
+    c = ["fecha BETWEEN ? AND ?", "fecha <= '2026-03-01'"]
+    p = [fecha_ini.isoformat(), fecha_fin.isoformat()]
     if semestre == "Primer semestre":    c.append("mes BETWEEN 1 AND 6")
     elif semestre == "Segundo semestre": c.append("mes BETWEEN 7 AND 12")
     if rubro and rubro != "Todos":
@@ -500,6 +524,13 @@ cent_act   = _si(met_df, "cent_activas")
 vol_total  = _sf(tot_df, "vol_total")
 vol_rape   = _sf(rape_df, "vol_rape")
 
+# Precio promedio general del periodo filtrado
+precio_prom_general = (
+    serie_pr_df["precio_promedio"].mean()
+    if not serie_pr_df.empty and rubro_sel != "Todos"
+    else None
+)
+
 # =========================================================
 # RANKING
 # =========================================================
@@ -545,14 +576,14 @@ def color_fill(codigo, depto):
     if str(codigo) in top30:
         return [110, 68, 255, 160]
     if deptos_sel_upper and str(depto).upper() in deptos_sel_upper:
-        return [255, 200, 50, 120]   # amarillo para depto filtrado
+        return [180, 190, 205, 60]   # gris azulado muy suave
     return [40, 48, 62, 18]
 
 def color_line(codigo, depto):
     if str(codigo) in top30:
         return [170, 130, 255, 240]
     if deptos_sel_upper and str(depto).upper() in deptos_sel_upper:
-        return [255, 220, 80, 220]
+        return [200, 210, 225, 180]  # gris claro para el borde
     return [100, 110, 125, 60]
 
 mun_web = municipios[["nombre_municipio","departamento","codigo_origen","geometry"]].copy()
@@ -604,21 +635,33 @@ if not flujos_df.empty:
 # =========================================================
 
 @st.fragment
-def render_principal(vol_filtro, mun_act, cent_act,
+def render_principal(vol_filtro, mun_act, cent_act, precio_prom_general,
                      geojson_mun, flujos_df, cent_pts,
                      serie_ab_df, serie_pr_df, sk_top, nivel_sel,
-                     deptos_sel):
+                     deptos_sel, rubro_sel):
     left_col, center_col, right_col = st.columns([1.05, 3.8, 1.45], gap="small")
 
     with left_col:
         st.markdown('<div class="panel">', unsafe_allow_html=True)
         st.markdown('<div class="panel-title">Indicadores principales</div>', unsafe_allow_html=True)
+
+        # Precio promedio solo si hay rubro seleccionado
+        precio_html = ""
+        if rubro_sel != "Todos" and precio_prom_general is not None:
+            precio_html = f"""
+            <div class="metric-card">
+                <div class="metric-label">Precio promedio</div>
+                <div class="metric-value" style="font-size:1.65rem;">$ {precio_prom_general:,.0f}</div>
+                <div class="metric-small">Mercado filtrado ($/kg)</div>
+            </div>"""
+
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-label">Toneladas abastecidas</div>
             <div class="metric-value">{vol_filtro:,.0f}</div>
             <div class="metric-small">Periodo filtrado</div>
         </div>
+        {precio_html}
         <div class="metric-card">
             <div class="metric-label">Municipios origen activos</div>
             <div class="metric-value">{mun_act:,}</div>
@@ -634,7 +677,7 @@ def render_principal(vol_filtro, mun_act, cent_act,
         st.markdown('<div class="panel-title">Leyenda</div>', unsafe_allow_html=True)
         leyenda_depto = ""
         if deptos_sel:
-            leyenda_depto = '<div class="legend-item"><span class="legend-box" style="background:#FFC832;"></span>Municipios depto. filtrado</div>'
+            leyenda_depto = '<div class="legend-item"><span class="legend-box" style="background:#B0B8C8;border:1px solid #888;"></span>Municipios depto. filtrado</div>'
         st.markdown(f"""
         <div class="legend-item"><span class="legend-box" style="background:#6E44FF;"></span>Top 30 abastecedores</div>
         {leyenda_depto}
@@ -683,7 +726,7 @@ def render_principal(vol_filtro, mun_act, cent_act,
                 "html": "<b>{tipo_elemento}</b><br/>{detalle_1}<br/>{detalle_2}<br/>{detalle_3}<br/>{detalle_4}",
                 "style": {"backgroundColor":"rgba(18,22,29,0.95)","color":"#F5F7FA","fontSize":"12px"}
             },
-            map_style="mapbox://styles/mapbox/dark-v10",
+            map_style="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
         )
         st.pydeck_chart(deck, use_container_width=True)
 
@@ -733,9 +776,11 @@ def render_principal(vol_filtro, mun_act, cent_act,
 
 render_principal(
     vol_filtro=vol_filtro, mun_act=mun_act, cent_act=cent_act,
+    precio_prom_general=precio_prom_general,
     geojson_mun=geojson_mun, flujos_df=flujos_df, cent_pts=cent_pts,
     serie_ab_df=serie_ab_df, serie_pr_df=serie_pr_df,
-    sk_top=sk_top, nivel_sel=nivel_sel, deptos_sel=deptos_sel
+    sk_top=sk_top, nivel_sel=nivel_sel, deptos_sel=deptos_sel,
+    rubro_sel=rubro_sel
 )
 
 # =========================================================
@@ -743,10 +788,11 @@ render_principal(
 # =========================================================
 
 @st.fragment
-def render_tabla(rk, vol_filtro, vol_total, vol_rape, max_filas):
+def render_tabla(rk, serie_pr_df, vol_filtro, vol_total, vol_rape, max_filas, rubro_sel):
     st.markdown('<div class="panel-title" style="margin-top:0.8rem;">Tabla consolidada de análisis</div>', unsafe_allow_html=True)
 
     if not rk.empty:
+        # Calcular precio promedio por municipio desde serie_pr si hay rubro
         tabla = rk[[
             "ranking","municipio_origen","departamento_origen",
             "toneladas_total","meses_participacion",
@@ -799,5 +845,6 @@ def render_tabla(rk, vol_filtro, vol_total, vol_rape, max_filas):
     """, unsafe_allow_html=True)
 
 
-render_tabla(rk=rk, vol_filtro=vol_filtro, vol_total=vol_total,
-             vol_rape=vol_rape, max_filas=MAX_FILAS_TABLA)
+render_tabla(rk=rk, serie_pr_df=serie_pr_df, vol_filtro=vol_filtro,
+             vol_total=vol_total, vol_rape=vol_rape,
+             max_filas=MAX_FILAS_TABLA, rubro_sel=rubro_sel)
