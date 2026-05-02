@@ -34,7 +34,7 @@ DEPTOS_RAPE = {
 }
 
 MAX_FILAS_TABLA    = 300
-MAX_LINEAS_MAPA    = 600
+MAX_LINEAS_MAPA    = 1200  # aumentado para mostrar más flujos por defecto
 
 # =========================================================
 # KEEP-ALIVE
@@ -458,7 +458,7 @@ st.markdown(f"""
 # =========================================================
 
 st.markdown('<div class="filter-wrap">', unsafe_allow_html=True)
-f1, f2, f3, f4, f5, f6 = st.columns([1.1, 1.3, 1.5, 1.0, 1.0, 1.4])
+f1, f2, f3, f4, f5, f6, f7 = st.columns([1.0, 1.2, 1.4, 0.9, 0.9, 1.3, 0.9])
 
 with f1:
     grupo_sel = st.selectbox("Grupo", ["Todos"] + grupos, index=0)
@@ -481,6 +481,9 @@ with f5:
 with f6:
     rango = st.date_input("Fechas", value=(fecha_min_g, fecha_max_g),
                           min_value=fecha_min_g, max_value=fecha_max_g)
+with f7:
+    max_flujos = st.slider("Flujos mapa", min_value=100, max_value=2000,
+                           value=MAX_LINEAS_MAPA, step=100, label_visibility="collapsed")
 
 st.markdown("</div>", unsafe_allow_html=True)
 
@@ -549,10 +552,15 @@ if not rank_df.empty:
     rk["ranking"] = rk.index + 1
     top30 = set(rk.sort_values("toneladas_total", ascending=False).head(30)["cod_municipio"].astype(str))
     if not flujos_df.empty:
-        flujos_df = flujos_df.head(MAX_LINEAS_MAPA).copy()
+        total_ton_flujos = flujos_df["toneladas_total"].sum()
+        flujos_df = flujos_df.head(max_flujos).copy()
+        ton_visible = flujos_df["toneladas_total"].sum()
+        pct_cobertura = (ton_visible / total_ton_flujos * 100) if total_ton_flujos > 0 else 0
         vmin,vmax = flujos_df["toneladas_total"].min(), flujos_df["toneladas_total"].max()
         flujos_df["ancho"] = 2 + 10*((flujos_df["toneladas_total"]-vmin)/(vmax-vmin+1e-9))
         flujos_df["ton_fmt"] = flujos_df["toneladas_total"].map(formatear_ton)
+    else:
+        pct_cobertura = 0
     if not sankey_df.empty:
         top_mun = sankey_df.groupby("municipio_origen")["toneladas_total"].sum().nlargest(12).index.tolist()
         sk_top  = sankey_df[sankey_df["municipio_origen"].isin(top_mun)].copy()
@@ -563,6 +571,7 @@ else:
     top30  = set()
     flujos_df = pd.DataFrame()
     sk_top = pd.DataFrame(columns=["municipio_origen","central_mayorista","toneladas_total"])
+    pct_cobertura = 0
 
 # =========================================================
 # MAPA — polígonos con colores por estado
@@ -638,7 +647,7 @@ if not flujos_df.empty:
 def render_principal(vol_filtro, mun_act, cent_act, precio_prom_general,
                      geojson_mun, flujos_df, cent_pts,
                      serie_ab_df, serie_pr_df, sk_top, nivel_sel,
-                     deptos_sel, rubro_sel):
+                     deptos_sel, rubro_sel, max_flujos, pct_cobertura):
     left_col, center_col, right_col = st.columns([1.05, 3.8, 1.45], gap="small")
 
     with left_col:
@@ -646,14 +655,13 @@ def render_principal(vol_filtro, mun_act, cent_act, precio_prom_general,
         st.markdown('<div class="panel-title">Indicadores principales</div>', unsafe_allow_html=True)
 
         # Precio promedio solo si hay rubro seleccionado
-        precio_html = ""
         if rubro_sel != "Todos" and precio_prom_general is not None:
-            precio_html = f"""
+            st.markdown(f"""
             <div class="metric-card">
                 <div class="metric-label">Precio promedio</div>
                 <div class="metric-value" style="font-size:1.65rem;">$ {precio_prom_general:,.0f}</div>
                 <div class="metric-small">Mercado filtrado ($/kg)</div>
-            </div>"""
+            </div>""", unsafe_allow_html=True)
 
         st.markdown(f"""
         <div class="metric-card">
@@ -661,7 +669,6 @@ def render_principal(vol_filtro, mun_act, cent_act, precio_prom_general,
             <div class="metric-value">{vol_filtro:,.0f}</div>
             <div class="metric-small">Periodo filtrado</div>
         </div>
-        {precio_html}
         <div class="metric-card">
             <div class="metric-label">Municipios origen activos</div>
             <div class="metric-value">{mun_act:,}</div>
@@ -684,8 +691,10 @@ def render_principal(vol_filtro, mun_act, cent_act, precio_prom_general,
         <div class="legend-item"><span class="legend-box" style="background:#F5B041;"></span>Arcos de flujo OD</div>
         <div class="legend-item"><span class="legend-box" style="background:#00D2FF;"></span>Central mayorista</div>
         <div class="small-note" style="margin-top:0.75rem;">
-            Sin filtro de rubro los arcos muestran el flujo agregado municipio–central.
-            Al seleccionar grupo o rubro se filtra automáticamente.
+            <b>Flujos en mapa:</b> se muestran los {max_flujos:,} principales flujos origen–destino
+            ordenados por volumen, representando el <b>{pct_cobertura:.0f}%</b> del total abastecido
+            bajo los filtros activos. Los gráficos y la tabla reflejan el total de registros
+            independientemente de este parámetro.
         </div>
         """, unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
@@ -780,7 +789,7 @@ render_principal(
     geojson_mun=geojson_mun, flujos_df=flujos_df, cent_pts=cent_pts,
     serie_ab_df=serie_ab_df, serie_pr_df=serie_pr_df,
     sk_top=sk_top, nivel_sel=nivel_sel, deptos_sel=deptos_sel,
-    rubro_sel=rubro_sel
+    rubro_sel=rubro_sel, max_flujos=max_flujos, pct_cobertura=pct_cobertura
 )
 
 # =========================================================
@@ -805,8 +814,15 @@ def render_tabla(rk, serie_pr_df, vol_filtro, vol_total, vol_rape, max_filas, ru
             "Participación RAPE","Índice de eficiencia"
         ]
 
-        cols_ord = ["Ranking","Toneladas acumuladas","Meses activos",
-                    "Participación en filtro","Participación total","Índice de eficiencia"]
+        # Agregar precio promedio del periodo desde serie_pr si hay rubro
+        if rubro_sel != "Todos" and not serie_pr_df.empty:
+            precio_periodo = serie_pr_df["precio_promedio"].mean()
+            tabla.insert(4, "Precio prom. ($/kg)", f"$ {precio_periodo:,.0f}")
+            cols_ord = ["Ranking","Toneladas acumuladas","Meses activos",
+                        "Participación en filtro","Participación total","Índice de eficiencia"]
+        else:
+            cols_ord = ["Ranking","Toneladas acumuladas","Meses activos",
+                        "Participación en filtro","Participación total","Índice de eficiencia"]
         c1, c2 = st.columns([2,1])
         with c1:
             col_ord = st.selectbox("Ordenar por", cols_ord, index=0,
@@ -831,6 +847,14 @@ def render_tabla(rk, serie_pr_df, vol_filtro, vol_total, vol_rape, max_filas, ru
     else:
         st.info("No hay información disponible.")
 
+    st.markdown("""
+    <div class="method-note">
+        <b>⚠️ Nota sobre el precio:</b> El dato de precio promedio solo es interpretable
+        cuando se analiza un <b>rubro específico</b>. Si no hay rubro seleccionado,
+        el valor mostrado es un promedio entre diferentes productos y grupos de alimentos,
+        lo que <b>no tiene validez comparativa</b> y puede llevar a conclusiones incorrectas.
+    </div>
+    """, unsafe_allow_html=True)
     st.markdown("""
     <div class="method-note">
         <b>Índice de eficiencia:</b> Combina volumen acumulado abastecido (60%) y frecuencia
