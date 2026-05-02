@@ -729,24 +729,23 @@ def render_principal(vol_filtro, mun_act, cent_act, precio_prom_general,
             ))
 
         deck = pdk.Deck(
-            map_provider="carto",
-            map_style="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
-            layers=layers,
-            initial_view_state=pdk.ViewState(
-                latitude=4.5,
-                longitude=-74.1,
-                zoom=4.6,
-                pitch=0
-        ),
-        tooltip={
-            "html": "<b>{tipo_elemento}</b><br/>{detalle_1}<br/>{detalle_2}<br/>{detalle_3}<br/>{detalle_4}",
-            "style": {
-                "backgroundColor": "rgba(18,22,29,0.95)",
-                "color": "#F5F7FA",
-                "fontSize": "12px"
-            }
-        },
-    )
+    layers=layers,
+    initial_view_state=pdk.ViewState(
+        latitude=4.5,
+        longitude=-74.1,
+        zoom=4.6,
+        pitch=0
+    ),
+    tooltip={
+        "html": "<b>{tipo_elemento}</b><br/>{detalle_1}<br/>{detalle_2}<br/>{detalle_3}<br/>{detalle_4}",
+        "style": {
+            "backgroundColor": "rgba(18,22,29,0.95)",
+            "color": "#F5F7FA",
+            "fontSize": "12px"
+        }
+    },
+    map_style="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+)
         st.pydeck_chart(deck, use_container_width=True)
 
         # Serie mensual precio + toneladas
