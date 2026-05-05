@@ -297,13 +297,14 @@ BOGOTA_VARIANTES = {
     'BOGOTA','BOGOTÁ DC','BOGOTA DC','BOGOTÁ, D.C.','BOGOTÁ'
 }
 
-def build_where_ab(fecha_ini, fecha_fin, semestre, grupo, rubro, centrales, deptos):
+def build_where_ab(fecha_ini, fecha_fin, semestre, grupo, rubros, centrales, deptos):
     c = ["fecha_mes BETWEEN ? AND ?", "fecha_mes <= '2026-03-01'"]
     p = [fecha_ini.isoformat(), fecha_fin.isoformat()]
     if semestre == "Primer semestre":    c.append("mes BETWEEN 1 AND 6")
     elif semestre == "Segundo semestre": c.append("mes BETWEEN 7 AND 12")
-    if rubro and rubro != "Todos":
-        c.append("rubro = ?"); p.append(rubro)
+    if rubros:
+        # Uno o varios rubros seleccionados
+        c.append(f"rubro IN ({','.join(['?']*len(rubros))})"); p.extend(list(rubros))
     elif grupo and grupo != "Todos":
         c.append("grupo = ?"); p.append(grupo)
     if centrales:
@@ -319,13 +320,13 @@ def build_where_ab(fecha_ini, fecha_fin, semestre, grupo, rubro, centrales, dept
         c.append(f"departamento_origen IN ({','.join(['?']*len(deptos_norm))})"); p.extend(deptos_norm)
     return " AND ".join(c), p
 
-def build_where_pr(fecha_ini, fecha_fin, semestre, grupo, rubro, centrales):
+def build_where_pr(fecha_ini, fecha_fin, semestre, grupo, rubros, centrales):
     c = ["fecha BETWEEN ? AND ?", "fecha <= '2026-03-01'"]
     p = [fecha_ini.isoformat(), fecha_fin.isoformat()]
     if semestre == "Primer semestre":    c.append("mes BETWEEN 1 AND 6")
     elif semestre == "Segundo semestre": c.append("mes BETWEEN 7 AND 12")
-    if rubro and rubro != "Todos":
-        c.append("rubro = ?"); p.append(rubro)
+    if rubros:
+        c.append(f"rubro IN ({','.join(['?']*len(rubros))})"); p.extend(list(rubros))
     elif grupo and grupo != "Todos":
         c.append("grupo = ?"); p.append(grupo)
     if centrales:
@@ -508,7 +509,7 @@ with f2:
         ).df()["rubro"].tolist()
     else:
         rubros_f = rubros
-    rubro_sel = st.selectbox("Rubro", ["Todos"] + rubros_f, index=0)
+    rubros_sel = st.multiselect("Rubro", options=rubros_f, default=[], placeholder="Todos los rubros")
 with f3:
     centrales_sel = st.multiselect("Central mayorista", options=centrales, default=[])
 with f4:
@@ -539,19 +540,33 @@ else:
 
 centrales_t = tuple(centrales_sel)
 deptos_t    = tuple(deptos_sel)
-nivel_sel   = rubro_sel if rubro_sel != "Todos" else (grupo_sel if grupo_sel != "Todos" else "Todos los productos")
+rubros_t    = tuple(rubros_sel)
+
+# Para compatibilidad con lógica de precio: solo válido cuando hay exactamente 1 rubro
+rubro_unico = rubros_sel[0] if len(rubros_sel) == 1 else None
+tiene_rubro_unico = len(rubros_sel) == 1
+
+# Etiqueta para el Sankey y título
+if len(rubros_sel) == 1:
+    nivel_sel = rubros_sel[0]
+elif len(rubros_sel) > 1:
+    nivel_sel = f"{len(rubros_sel)} rubros seleccionados"
+elif grupo_sel != "Todos":
+    nivel_sel = grupo_sel
+else:
+    nivel_sel = "Todos los productos"
 
 # =========================================================
 # CONSULTAS
 # =========================================================
 
 met_df, tot_df, rape_df, rank_df, serie_ab_df, flujos_df, sankey_df = consultar_abast(
-    fecha_ini, fecha_fin, semestre_sel, grupo_sel, rubro_sel,
+    fecha_ini, fecha_fin, semestre_sel, grupo_sel, rubros_t,
     centrales_t, deptos_t, mtime_ab
 )
 
 serie_pr_df, precios_central_df = consultar_precios(
-    fecha_ini, fecha_fin, semestre_sel, grupo_sel, rubro_sel,
+    fecha_ini, fecha_fin, semestre_sel, grupo_sel, rubros_t,
     centrales_t, mtime_pr
 )
 
@@ -572,10 +587,10 @@ cent_act   = _si(met_df, "cent_activas")
 vol_total  = _sf(tot_df, "vol_total")
 vol_rape   = _sf(rape_df, "vol_rape")
 
-# Precio promedio general del periodo filtrado
+# Precio promedio general — solo válido con un único rubro seleccionado
 precio_prom_general = (
     serie_pr_df["precio_promedio"].mean()
-    if not serie_pr_df.empty and rubro_sel != "Todos"
+    if not serie_pr_df.empty and tiene_rubro_unico
     else None
 )
 
@@ -628,7 +643,7 @@ if not rank_df.empty:
 
     # ── Índice con precio si hay rubro seleccionado ───────────
     precio_ref_global = rk["precio_municipio"].median() if rk["precio_municipio"].notna().any() else 0
-    tiene_precio = rk["precio_municipio"].notna().any() and rubro_sel != "Todos"
+    tiene_precio = rk["precio_municipio"].notna().any() and tiene_rubro_unico
 
     if tiene_precio and precio_ref_global > 0:
         rk["ventaja_precio"] = (precio_ref_global - rk["precio_municipio"]) / precio_ref_global * 100
@@ -742,7 +757,7 @@ if not flujos_df.empty:
 def render_principal(vol_filtro, mun_act, cent_act, precio_prom_general,
                      geojson_mun, flujos_df, cent_pts,
                      serie_ab_df, serie_pr_df, sk_top, nivel_sel,
-                     deptos_sel, rubro_sel, max_flujos, pct_cobertura):
+                     deptos_sel, tiene_rubro_unico, max_flujos, pct_cobertura):
     left_col, center_col, right_col = st.columns([1.05, 3.8, 1.45], gap="small")
 
     with left_col:
@@ -750,7 +765,7 @@ def render_principal(vol_filtro, mun_act, cent_act, precio_prom_general,
         st.markdown('<div class="panel-title">Indicadores principales</div>', unsafe_allow_html=True)
 
         # Precio promedio solo si hay rubro seleccionado
-        if rubro_sel != "Todos" and precio_prom_general is not None:
+        if tiene_rubro_unico and precio_prom_general is not None:
             st.markdown(f"""
             <div class="metric-card">
                 <div class="metric-label">Precio promedio</div>
@@ -904,7 +919,8 @@ render_principal(
     geojson_mun=geojson_mun, flujos_df=flujos_df, cent_pts=cent_pts,
     serie_ab_df=serie_ab_df, serie_pr_df=serie_pr_df,
     sk_top=sk_top, nivel_sel=nivel_sel, deptos_sel=deptos_sel,
-    rubro_sel=rubro_sel, max_flujos=max_flujos, pct_cobertura=pct_cobertura
+    tiene_rubro_unico=tiene_rubro_unico,
+    max_flujos=max_flujos, pct_cobertura=pct_cobertura
 )
 
 # =========================================================
@@ -912,7 +928,7 @@ render_principal(
 # =========================================================
 
 @st.fragment
-def render_tabla(rk, vol_filtro, vol_total, vol_rape, max_filas, rubro_sel):
+def render_tabla(rk, vol_filtro, vol_total, vol_rape, max_filas, tiene_rubro_unico):
     st.markdown('<div class="panel-title" style="margin-top:0.8rem;">Tabla consolidada de análisis</div>', unsafe_allow_html=True)
 
     if not rk.empty:
@@ -926,7 +942,7 @@ def render_tabla(rk, vol_filtro, vol_total, vol_rape, max_filas, rubro_sel):
         tabla = rk[cols_base].copy()
         tabla.columns = nombres_base
 
-        tiene_precio = (rubro_sel != "Todos"
+        tiene_precio = (tiene_rubro_unico
                         and "precio_municipio" in rk.columns
                         and rk["precio_municipio"].notna().any())
         if tiene_precio:
@@ -982,29 +998,37 @@ def render_tabla(rk, vol_filtro, vol_total, vol_rape, max_filas, rubro_sel):
 
     st.markdown("""
     <div class="method-note">
-        <b>⚠️ Nota sobre el precio:</b> El dato de precio solo es interpretable cuando se analiza
-        un <b>rubro específico</b>. Sin rubro seleccionado, el valor refleja un promedio entre
-        diferentes productos y grupos de alimentos, lo que <b>no tiene validez comparativa</b>
-        y puede llevar a conclusiones incorrectas.
+        <b>⚠️ Nota sobre el precio:</b> El dato de precio solo es interpretable cuando se selecciona
+        <b>un único rubro</b>. Con múltiples rubros o sin rubro seleccionado, el valor refleja un
+        promedio entre productos de diferente naturaleza y escala de precios, lo que
+        <b>no tiene validez comparativa</b>.
     </div>
     """, unsafe_allow_html=True)
-
-    if rubro_sel != "Todos":
+    st.markdown("""
+    <div class="method-note">
+        <b>ℹ️ ¿Por qué aparece "Sin dato" en precio?</b> El precio se asigna según la central
+        mayorista a la que el municipio abastece bajo los filtros activos. Si esa central no
+        reporta precio para el rubro seleccionado en el período consultado en la base SIPSA,
+        el dato aparece como "Sin dato". Esto no indica un error — refleja la cobertura real
+        del sistema de precios del DANE, que no registra todas las centrales para todos los productos.
+    </div>
+    """, unsafe_allow_html=True)
+    if tiene_rubro_unico:
         st.markdown("""
         <div class="method-note">
             <b>Índice de eficiencia (con precio):</b> Combina ventaja de precio frente a la
             mediana del mercado filtrado (40%), volumen acumulado (40%) y frecuencia de
-            participación mensual (20%). El precio se asigna por central mayorista destino,
-            ponderado por toneladas cuando el municipio abastece a varias centrales.
-            Un valor <b>positivo</b> de ventaja indica precio <b>más bajo</b> que la mediana.
+            participación mensual (20%). Un valor <b>positivo</b> de ventaja indica precio
+            <b>más bajo</b> que la mediana. Los municipios con "Sin dato" en precio se evalúan
+            solo por volumen y estabilidad (60%/40%).
         </div>
         """, unsafe_allow_html=True)
     else:
         st.markdown("""
         <div class="method-note">
             <b>Índice de eficiencia (sin precio):</b> Combina volumen acumulado abastecido (60%)
-            y frecuencia de participación mensual (40%). Para incluir el precio en el índice,
-            selecciona un rubro específico.
+            y frecuencia de participación mensual (40%). Selecciona un único rubro para incluir
+            el precio en el índice.
         </div>
         """, unsafe_allow_html=True)
 
@@ -1017,4 +1041,5 @@ def render_tabla(rk, vol_filtro, vol_total, vol_rape, max_filas, rubro_sel):
 
 
 render_tabla(rk=rk, vol_filtro=vol_filtro, vol_total=vol_total,
-             vol_rape=vol_rape, max_filas=MAX_FILAS_TABLA, rubro_sel=rubro_sel)
+             vol_rape=vol_rape, max_filas=MAX_FILAS_TABLA,
+             tiene_rubro_unico=tiene_rubro_unico)
