@@ -603,16 +603,23 @@ if not rank_df.empty:
     elif not flujos_df.empty:
         flujos_df["precio_central"] = np.nan
 
-    # Precio ponderado por municipio (avg de centrales pesado por toneladas)
+    # Precio por municipio — Opción A:
+    # Se usa SOLO el precio de las centrales que aparecen en los flujos filtrados.
+    # Si el usuario filtra por Corabastos, el precio de cada municipio es
+    # el de Corabastos únicamente, sin mezclar otras centrales sin precio.
+    # Esto evita NaN cuando el municipio abastece a otras centrales sin dato de precio.
     if not flujos_df.empty and "precio_central" in flujos_df.columns:
+        # Solo usar flujos que SÍ tienen precio (centrales filtradas con dato)
         sub = flujos_df.dropna(subset=["precio_central"])
         if not sub.empty:
-            def precio_ponderado(g):
-                if g["toneladas_total"].sum() > 0:
-                    return np.average(g["precio_central"], weights=g["toneladas_total"])
-                return np.nan
-            pm = sub.groupby("cod_municipio").apply(precio_ponderado).reset_index()
-            pm.columns = ["cod_municipio","precio_municipio"]
+            # Precio ponderado por toneladas — solo sobre centrales con precio disponible
+            pm = (
+                sub.groupby("cod_municipio")
+                .apply(lambda g: np.average(g["precio_central"], weights=g["toneladas_total"])
+                       if g["toneladas_total"].sum() > 0 else np.nan)
+                .reset_index()
+            )
+            pm.columns = ["cod_municipio", "precio_municipio"]
             rk = rk.merge(pm, on="cod_municipio", how="left")
         else:
             rk["precio_municipio"] = np.nan
