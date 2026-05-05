@@ -437,6 +437,18 @@ def consultar_precios_por_central(fecha_ini, fecha_fin, semestre, grupo, rubro,
         GROUP BY 1
     """, p).df()
     return df
+
+@st.cache_data(show_spinner=False)
+def consultar_precios_serie(fecha_ini, fecha_fin, semestre, grupo, rubro,
+                             centrales_t, mtime):
+    con  = get_con_precios(mtime)
+    w, p = build_where_pr(fecha_ini, fecha_fin, semestre, grupo, rubro, centrales_t)
+    df = con.execute(f"""
+        SELECT etiqueta_mes, AVG(precio) AS precio_promedio
+        FROM precios WHERE {w}
+        GROUP BY 1 ORDER BY 1
+    """, p).df()
+    return df
     con  = get_con_precios(mtime)
     w, p = build_where_pr(fecha_ini, fecha_fin, semestre, grupo, rubro, centrales_t)
     df = con.execute(f"""
