@@ -424,39 +424,36 @@ def consultar_abast(fecha_ini, fecha_fin, semestre, grupo, rubro,
 # =========================================================
 
 @st.cache_data(show_spinner=False)
-def consultar_precios_por_central(fecha_ini, fecha_fin, semestre, grupo, rubro,
-                                   centrales_t, mtime_pr):
-    """Precio promedio por central para cruzar con flujos de abastecimiento."""
+@st.cache_data(show_spinner=False)
+def consultar_precios(fecha_ini, fecha_fin, semestre, grupo, rubro,
+                      centrales_t, mtime_pr):
+    """Un solo escaneo de precios que devuelve serie mensual y precio por central."""
     con  = get_con_precios(mtime_pr)
     w, p = build_where_pr(fecha_ini, fecha_fin, semestre, grupo, rubro, centrales_t)
-    df = con.execute(f"""
-        SELECT central_mayorista,
-               AVG(precio) AS precio_central,
-               COUNT(*)    AS n_registros
-        FROM precios WHERE {w}
-        GROUP BY 1
+    resultado = con.execute(f"""
+        WITH base AS (SELECT * FROM precios WHERE {w})
+        SELECT 'serie'   AS _t, TO_JSON(s) AS _j
+        FROM (
+            SELECT etiqueta_mes, AVG(precio) AS precio_promedio
+            FROM base GROUP BY 1 ORDER BY 1
+        ) s
+        UNION ALL
+        SELECT 'central' AS _t, TO_JSON(c) AS _j
+        FROM (
+            SELECT central_mayorista,
+                   AVG(precio) AS precio_central,
+                   COUNT(*)    AS n_registros
+            FROM base GROUP BY 1
+        ) c
     """, p).df()
-    return df
 
-@st.cache_data(show_spinner=False)
-def consultar_precios_serie(fecha_ini, fecha_fin, semestre, grupo, rubro,
-                             centrales_t, mtime):
-    con  = get_con_precios(mtime)
-    w, p = build_where_pr(fecha_ini, fecha_fin, semestre, grupo, rubro, centrales_t)
-    df = con.execute(f"""
-        SELECT etiqueta_mes, AVG(precio) AS precio_promedio
-        FROM precios WHERE {w}
-        GROUP BY 1 ORDER BY 1
-    """, p).df()
-    return df
-    con  = get_con_precios(mtime)
-    w, p = build_where_pr(fecha_ini, fecha_fin, semestre, grupo, rubro, centrales_t)
-    df = con.execute(f"""
-        SELECT etiqueta_mes, AVG(precio) AS precio_promedio
-        FROM precios WHERE {w}
-        GROUP BY 1 ORDER BY 1
-    """, p).df()
-    return df
+    def ex(nombre):
+        rows = resultado[resultado["_t"] == nombre]["_j"].tolist()
+        if not rows: return pd.DataFrame()
+        return pd.DataFrame([json.loads(r) for r in rows])
+
+    return ex("serie"), ex("central")
+
 
 # =========================================================
 # CARGA INICIAL
@@ -553,12 +550,7 @@ met_df, tot_df, rape_df, rank_df, serie_ab_df, flujos_df, sankey_df = consultar_
     centrales_t, deptos_t, mtime_ab
 )
 
-serie_pr_df = consultar_precios_serie(
-    fecha_ini, fecha_fin, semestre_sel, grupo_sel, rubro_sel,
-    centrales_t, mtime_pr
-)
-
-precios_central_df = consultar_precios_por_central(
+serie_pr_df, precios_central_df = consultar_precios(
     fecha_ini, fecha_fin, semestre_sel, grupo_sel, rubro_sel,
     centrales_t, mtime_pr
 )
