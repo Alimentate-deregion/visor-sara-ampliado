@@ -899,6 +899,9 @@ cent_act   = _si(met_df, "cent_activas")
 vol_total  = _sf(tot_df, "vol_total")
 vol_rape   = _sf(rape_df, "vol_rape")
 
+vol_intl         = intl_df["toneladas_total"].sum() if not intl_df.empty else 0.0
+vol_filtro_total = vol_filtro + vol_intl
+
 # Precio promedio general — solo válido con un único rubro seleccionado
 precio_prom_general = (
     serie_pr_df["precio_promedio"].mean()
@@ -998,6 +1001,34 @@ if not rank_df.empty:
         top_paises = intl_df.groupby("pais_origen")["toneladas_total"].sum().nlargest(2).index.tolist()
         intl_sk = intl_sk[intl_sk["municipio_origen"].isin(["* " + p for p in top_paises])]
         sk_top = pd.concat([sk_top, intl_sk], ignore_index=True)
+
+    # Agregar internacionales al ranking (tabla)
+    if not intl_df.empty:
+        intl_rk = intl_df.groupby("pais_origen", as_index=False).agg(
+            toneladas_total=("toneladas_total","sum"),
+            meses_participacion=("toneladas_total","count"),
+        )
+        intl_rk["municipio_origen"]    = "* " + intl_rk["pais_origen"]
+        intl_rk["departamento_origen"] = "Internacional"
+        intl_rk["cod_municipio"]       = "intl"
+        intl_rk["precio_municipio"]    = np.nan
+        intl_rk["ventaja_precio"]      = np.nan
+        intl_rk["part_filtro"] = (
+            intl_rk["toneladas_total"] / vol_filtro_total * 100
+            if vol_filtro_total > 0 else 0.0
+        )
+        intl_rk["part_total"]  = 0.0
+        intl_rk["part_rape"]   = 0.0
+        intl_rk["indice"]      = np.nan
+        cols = ["municipio_origen","departamento_origen","cod_municipio",
+                "toneladas_total","meses_participacion","part_filtro",
+                "part_total","part_rape","precio_municipio","ventaja_precio","indice"]
+        for col in cols:
+            if col not in rk.columns:       rk[col] = np.nan
+            if col not in intl_rk.columns:  intl_rk[col] = np.nan
+        rk = pd.concat([rk, intl_rk[cols]], ignore_index=True)
+        rk = rk.sort_values("toneladas_total", ascending=False).reset_index(drop=True)
+        rk["ranking"] = rk.index + 1
 else:
     rk        = pd.DataFrame()
     top30     = set()
@@ -1087,7 +1118,7 @@ if not flujos_df.empty:
 # =========================================================
 
 @st.fragment
-def render_principal(vol_filtro, mun_act, cent_act, precio_prom_general,
+def render_principal(vol_filtro, vol_filtro_total, mun_act, cent_act, precio_prom_general,
                      geojson_mun, flujos_df, cent_pts, intl_df,
                      serie_ab_df, serie_pr_df, sk_top, nivel_sel,
                      deptos_sel, tiene_rubro_unico, max_flujos, pct_cobertura,
@@ -1247,7 +1278,7 @@ def render_principal(vol_filtro, mun_act, cent_act, precio_prom_general,
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-label">Toneladas abastecidas</div>
-            <div class="metric-value" style="font-size:1.5rem;">{vol_filtro:,.0f}</div>
+            <div class="metric-value" style="font-size:1.5rem;">{vol_filtro_total:,.0f}</div>
             <div class="metric-small">Periodo filtrado</div>
         </div>
         <div class="metric-card">
@@ -1275,7 +1306,8 @@ def render_principal(vol_filtro, mun_act, cent_act, precio_prom_general,
 
 
 render_principal(
-    vol_filtro=vol_filtro, mun_act=mun_act, cent_act=cent_act,
+    vol_filtro=vol_filtro, vol_filtro_total=vol_filtro_total,
+    mun_act=mun_act, cent_act=cent_act,
     precio_prom_general=precio_prom_general,
     geojson_mun=geojson_mun, flujos_df=flujos_df, cent_pts=cent_pts,
     intl_df=intl_df,
