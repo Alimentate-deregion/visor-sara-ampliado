@@ -414,6 +414,8 @@ def consultar_catalogos(mtime_ab, mtime_pr):
         ORDER BY 1
     """).df()["departamento_origen"].tolist()
     deptos = list(dict.fromkeys(deptos_raw))
+    if "INTERNACIONAL" not in deptos:
+        deptos.append("INTERNACIONAL")
     municipios_raw = ca.execute("""
         SELECT DISTINCT municipio_origen, departamento_origen
         FROM lineas WHERE municipio_origen IS NOT NULL
@@ -646,35 +648,6 @@ st.markdown(f"""
 # FILTROS
 # =========================================================
 
-# =========================================================
-# FILTROS
-# =========================================================
-
-# El checkbox de priorizados SARA debe definirse ANTES del selector de rubros
-# para poder filtrar las opciones disponibles
-with st.expander("**FILTROS DEL PROYECTO SARA**", expanded=False):
-    sc1, sc2, sc3 = st.columns([1.0, 1.2, 1.2])
-    with sc1:
-        solo_priorizados = st.checkbox(
-            "Rubros priorizados SARA", value=False,
-            help="Filtra el selector de Rubro a los 37 rubros priorizados SARA"
-        )
-        st.markdown('<div style="font-size:0.8rem;color:#9EABC0;margin-top:0.6rem;">Municipios priorizados</div>', unsafe_allow_html=True)
-        prio_oferta  = st.checkbox("Oferta",  value=False, key="prio_oferta")
-        prio_demanda = st.checkbox("Demanda", value=False, key="prio_demanda")
-    territorios_opciones = sorted(TERRITORIOS_FUNC.keys())
-    mitad = (len(territorios_opciones) + 1) // 2
-    territorio_checks = {}
-    with sc2:
-        st.markdown('<div style="font-size:0.8rem;color:#9EABC0;margin-bottom:0.3rem;">Territorio funcional</div>', unsafe_allow_html=True)
-        for t in territorios_opciones[:mitad]:
-            territorio_checks[t] = st.checkbox(t, value=False, key=f"terr_{t}")
-    with sc3:
-        st.markdown('<div style="font-size:0.8rem;color:#9EABC0;margin-bottom:0.3rem;">&nbsp;</div>', unsafe_allow_html=True)
-        for t in territorios_opciones[mitad:]:
-            territorio_checks[t] = st.checkbox(t, value=False, key=f"terr_{t}")
-territorio_sel = [t for t, v in territorio_checks.items() if v]
-
 st.markdown('<div class="filter-wrap">', unsafe_allow_html=True)
 
 # ── Fila 1: Grupo | Rubro | Central | Periodo | Fechas ───
@@ -682,8 +655,10 @@ f1, f2, f3, f4, f5 = st.columns([1.1, 1.5, 1.5, 1.0, 1.4])
 with f1:
     grupo_sel = st.selectbox("Grupo", ["Todos"] + grupos, index=0)
 with f2:
-    # Si priorizados SARA activo, filtrar opciones al conjunto priorizado
-    if solo_priorizados:
+    # Valores por defecto de filtros SARA — se sobreescriben si el expander ya fue renderizado
+    # Usamos session_state para leer el valor actual antes de renderizar el expander
+    _solo_prio = st.session_state.get("_cb_solo_prio", False)
+    if _solo_prio:
         rubros_f_codigos = sorted(RUBROS_PRIORIZADOS_SARA, key=lambda r: label_rubro(r))
     elif grupo_sel != "Todos":
         con_tmp = get_con_abast(mtime_ab)
@@ -707,7 +682,7 @@ with f5:
 
 st.markdown('<div style="height:0.4rem;"></div>', unsafe_allow_html=True)
 
-# ── Fila 2: Depto | Municipio | Internacional | Slider ───
+# ── Fila 2: Depto | Municipio | País | Toggle | Slider ───
 g1, g2, g3, g4, g5 = st.columns([1.1, 1.2, 1.2, 0.9, 1.0])
 with g1:
     deptos_sel = st.multiselect("Depto. origen", deptos, default=[])
@@ -752,6 +727,31 @@ with g5:
                            value=MAX_LINEAS_MAPA, step=100, label_visibility="collapsed")
 
 st.markdown("</div>", unsafe_allow_html=True)
+
+# ── Expander SARA — debajo de los filtros principales ────
+with st.expander("**FILTROS DEL PROYECTO SARA**", expanded=False):
+    sc1, sc2, sc3 = st.columns([1.0, 1.2, 1.2])
+    with sc1:
+        solo_priorizados = st.checkbox(
+            "Rubros priorizados SARA", value=False,
+            key="_cb_solo_prio",
+            help="Filtra el selector de Rubro a los 37 rubros priorizados SARA"
+        )
+        st.markdown('<div style="font-size:0.8rem;color:#9EABC0;margin-top:0.6rem;">Municipios priorizados</div>', unsafe_allow_html=True)
+        prio_oferta  = st.checkbox("Oferta",  value=False, key="prio_oferta")
+        prio_demanda = st.checkbox("Demanda", value=False, key="prio_demanda")
+    territorios_opciones = sorted(TERRITORIOS_FUNC.keys())
+    mitad = (len(territorios_opciones) + 1) // 2
+    territorio_checks = {}
+    with sc2:
+        st.markdown('<div style="font-size:0.8rem;color:#9EABC0;margin-bottom:0.3rem;">Territorio funcional</div>', unsafe_allow_html=True)
+        for t in territorios_opciones[:mitad]:
+            territorio_checks[t] = st.checkbox(t, value=False, key=f"terr_{t}")
+    with sc3:
+        st.markdown('<div style="font-size:0.8rem;color:#9EABC0;margin-bottom:0.3rem;">&nbsp;</div>', unsafe_allow_html=True)
+        for t in territorios_opciones[mitad:]:
+            territorio_checks[t] = st.checkbox(t, value=False, key=f"terr_{t}")
+territorio_sel = [t for t, v in territorio_checks.items() if v]
 
 # ── Botón limpiar todos los filtros ──────────────────────
 if st.button("🗑 Limpiar todos los filtros", key="btn_limpiar"):
@@ -1127,13 +1127,11 @@ def render_principal(vol_filtro_total, mun_act, cent_act, precio_prom_general,
             </div>""", unsafe_allow_html=True)
 
         vol_intl = intl_df["toneladas_total"].sum() if not intl_df.empty else 0
-        nota_intl = f'<div class="metric-small" style="color:#00C878;">+ {vol_intl:,.0f} ton. internacionales</div>' if vol_intl > 0 else ""
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-label">Toneladas abastecidas</div>
             <div class="metric-value">{vol_filtro_total:,.0f}</div>
             <div class="metric-small">Periodo filtrado</div>
-            {nota_intl}
         </div>
         <div class="metric-card">
             <div class="metric-label">Municipios origen activos</div>
