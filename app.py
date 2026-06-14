@@ -79,7 +79,7 @@ RUBROS_PRIORIZADOS_SARA = {
     "Guayaba","Habichuela","Lechuga","Limon","Lulo","Mandarina","Mango",
     "Maracuya","Mora","Name","Naranja","Papa","Papaya","Pina","Platano","Tomate",
     "Tomate_de_arbol","Yuca","Zanahoria","Carne_cerdo","Carne_pollo",
-    "Carne_res","Pescado","Huevos","Leche","Quesos_cuajadas","Panela","Maiz"
+    "Carne_res","Pescado","Huevos","Leche","Quesos_cuajadas","Panela"
 }
 
 # ── Municipios priorizados SARA ────────────────────────────
@@ -98,6 +98,8 @@ MUNS_DEMANDA = {
     '25513','25662','25754','25843','25875','25899'
 }
 MUNS_AMBOS = MUNS_OFERTA & MUNS_DEMANDA
+
+# ── Territorios funcionales (fuente: Municipios_RAPE.xlsx) ─
 TERRITORIOS_FUNC = {
     "Bogotá, D.C.":     ['11001'],
     "Noroccidental":    ['25148','25214','25260','25320','25394','25398','25402',
@@ -120,6 +122,13 @@ TERRITORIOS_FUNC = {
                          '25524','25535','25599','25612','25645','25649','25740',
                          '25743','25754','25797','25805','25815','25878'],
 }
+
+# ── Región Central y Metropolitana ────────────────────────
+DEPTOS_REGION_CENTRAL = {
+    'BOYACÁ','BOYACA','CUNDINAMARCA','HUILA','META','TOLIMA',
+    'BOGOTÁ','BOGOTÁ, D.C.','BOGOTA','BOGOTA D.C.','BOGOTÁ D.C.'
+}
+MUNS_REGION_METROPOLITANA = {'11001','25754','25290'}  # Bogotá, Soacha, Fusagasugá
 
 # ── Países de origen internacional ────────────────────────
 PAISES_COORDS = {
@@ -644,11 +653,13 @@ st.markdown(f"""
 
 # Leer valores SARA desde session_state ANTES de renderizar filtros
 # Los widgets del expander SARA se definen después pero persisten via session_state
-solo_priorizados = st.session_state.get("_cb_solo_prio", False)
-prio_oferta      = st.session_state.get("prio_oferta",   False)
-prio_demanda     = st.session_state.get("prio_demanda",  False)
-territorio_sel   = [t for t in sorted(TERRITORIOS_FUNC.keys())
-                    if st.session_state.get(f"terr_{t}", False)]
+solo_priorizados        = st.session_state.get("_cb_solo_prio", False)
+prio_oferta             = st.session_state.get("prio_oferta",   False)
+prio_demanda            = st.session_state.get("prio_demanda",  False)
+prio_region_central     = st.session_state.get("prio_rc",       False)
+prio_region_metropolitana = st.session_state.get("prio_rm",     False)
+territorio_sel          = [t for t in sorted(TERRITORIOS_FUNC.keys())
+                           if st.session_state.get(f"terr_{t}", False)]
 
 st.markdown('<div class="filter-wrap">', unsafe_allow_html=True)
 
@@ -684,26 +695,48 @@ st.markdown('<div style="height:0.4rem;"></div>', unsafe_allow_html=True)
 # ── Fila 2: Depto | Municipio | País | Toggle | Slider ───
 g1, g2, g3, g4, g5 = st.columns([1.1, 1.2, 1.2, 0.9, 1.0])
 with g1:
-    deptos_sel = st.multiselect("Depto. origen", deptos, default=[])
+    # Calcular conjunto de municipios SARA activo para restringir deptos
+    _muns_sara = None
+    if prio_oferta and prio_demanda:   _muns_sara = MUNS_AMBOS
+    elif prio_oferta:                  _muns_sara = MUNS_OFERTA
+    elif prio_demanda:                 _muns_sara = MUNS_DEMANDA
+    if prio_region_metropolitana:
+        _muns_sara = (_muns_sara & MUNS_REGION_METROPOLITANA) if _muns_sara else MUNS_REGION_METROPOLITANA
+    if territorio_sel:
+        _muns_terr_g1 = set()
+        for t in territorio_sel: _muns_terr_g1.update(TERRITORIOS_FUNC.get(t, []))
+        _muns_sara = (_muns_sara & _muns_terr_g1) if _muns_sara else _muns_terr_g1
+    # Restringir deptos disponibles
+    if _muns_sara and "cod_municipio" in municipios_df.columns:
+        _deptos_sara = set(
+            municipios_df[municipios_df["cod_municipio"].astype(str).isin(_muns_sara)]["departamento_origen"].str.upper().dropna().tolist()
+        )
+        deptos_opciones = [d for d in deptos if d.upper() in _deptos_sara or d == "INTERNACIONAL"]
+    elif prio_region_central:
+        deptos_opciones = [d for d in deptos if d.upper() in DEPTOS_REGION_CENTRAL or d == "INTERNACIONAL"]
+    else:
+        deptos_opciones = deptos
+    deptos_sel = st.multiselect("Depto. origen", deptos_opciones, default=[])
 with g2:
     deptos_sin_intl = [d for d in deptos_sel if d != "INTERNACIONAL"]
     if deptos_sin_intl:
         muns_base = municipios_df[municipios_df["departamento_origen"].isin(deptos_sin_intl)]["municipio_origen"].unique().tolist()
     else:
         muns_base = municipios_df["municipio_origen"].unique().tolist()
-    # Filtrar por priorizados SARA si hay filtro activo (usando vars leídas de session_state)
+    # Filtrar municipios por SARA
     _muns_prio_temp = None
     if prio_oferta and prio_demanda:   _muns_prio_temp = MUNS_AMBOS
     elif prio_oferta:                  _muns_prio_temp = MUNS_OFERTA
     elif prio_demanda:                 _muns_prio_temp = MUNS_DEMANDA
+    if prio_region_metropolitana:
+        _muns_prio_temp = (_muns_prio_temp & MUNS_REGION_METROPOLITANA) if _muns_prio_temp else MUNS_REGION_METROPOLITANA
     if territorio_sel:
         _muns_terr = set()
         for t in territorio_sel: _muns_terr.update(TERRITORIOS_FUNC.get(t, []))
         _muns_prio_temp = (_muns_prio_temp & _muns_terr) if _muns_prio_temp else _muns_terr
-    if _muns_prio_temp:
+    if _muns_prio_temp and "cod_municipio" in municipios_df.columns:
         muns_prio_nombres = set(
             municipios_df[municipios_df["cod_municipio"].astype(str).isin(_muns_prio_temp)]["municipio_origen"].tolist()
-            if "cod_municipio" in municipios_df.columns else []
         )
         muns_base = [m for m in muns_base if m in muns_prio_nombres] or muns_base
     muns_opciones = sorted(muns_base)
@@ -732,11 +765,14 @@ with st.expander("**FILTROS DEL PROYECTO SARA**", expanded=False):
         solo_priorizados = st.checkbox(
             "Rubros priorizados SARA", value=False,
             key="_cb_solo_prio",
-            help="Filtra el selector de Rubro a los 37 rubros priorizados SARA"
+            help="Filtra el selector de Rubro a los 36 rubros priorizados SARA"
         )
         st.markdown('<div style="font-size:0.8rem;color:#9EABC0;margin-top:0.6rem;">Municipios priorizados</div>', unsafe_allow_html=True)
         prio_oferta  = st.checkbox("Oferta",  value=False, key="prio_oferta")
         prio_demanda = st.checkbox("Demanda", value=False, key="prio_demanda")
+        st.markdown('<div style="font-size:0.8rem;color:#9EABC0;margin-top:0.6rem;">Alcance regional</div>', unsafe_allow_html=True)
+        prio_region_central      = st.checkbox("Región Central",      value=False, key="prio_rc")
+        prio_region_metropolitana = st.checkbox("Región Metropolitana", value=False, key="prio_rm")
     territorios_opciones = sorted(TERRITORIOS_FUNC.keys())
     mitad = (len(territorios_opciones) + 1) // 2
     territorio_checks = {}
@@ -764,11 +800,17 @@ elif prio_demanda:
 else:
     muns_prio = None
 
+if prio_region_metropolitana:
+    muns_prio = (muns_prio & MUNS_REGION_METROPOLITANA) if muns_prio else set(MUNS_REGION_METROPOLITANA)
+
 if territorio_sel:
     muns_territorio = set()
     for t in territorio_sel:
         muns_territorio.update(TERRITORIOS_FUNC.get(t, []))
     muns_prio = (muns_prio & muns_territorio) if muns_prio else muns_territorio
+
+# Región central filtra deptos en la consulta, no municipios
+deptos_region_central_t = tuple(DEPTOS_REGION_CENTRAL) if prio_region_central else ()
 
 if isinstance(rango, tuple) and len(rango) == 2:
     fecha_ini, fecha_fin = rango
@@ -782,17 +824,24 @@ municipios_t  = tuple(municipios_sel) if municipios_sel else ()
 paises_t      = tuple(paises_sel) if paises_sel else ()
 muns_prio_t   = tuple(sorted(muns_prio)) if muns_prio else ()
 
+# ── Lógica de internacionales ─────────────────────────────
+# incluir_intl: mostrar datos internacionales
 incluir_intl = (
     "INTERNACIONAL" in deptos_sel
     or bool(paises_sel)
     or not deptos_sel
 )
-# Solo INTERNACIONAL seleccionado = no ejecutar consultas nacionales
+# solo_internacional: SOLO mostrar internacionales (sin datos nacionales)
+# Ocurre cuando el único filtro de origen es INTERNACIONAL o países
 solo_internacional = (
+    bool(paises_sel) and not deptos_t and not municipios_t
+) or (
     bool(deptos_sel)
     and all(d == "INTERNACIONAL" for d in deptos_sel)
-    and not municipios_sel
+    and not municipios_t
 )
+# excluir_nacional: hay filtro de depto/municipio nacional pero no INTERNACIONAL
+excluir_intl_por_depto = bool(deptos_t) and "INTERNACIONAL" not in deptos_sel and not paises_sel
 
 rubro_unico       = rubros_sel[0] if len(rubros_sel) == 1 else None
 tiene_rubro_unico = len(rubros_sel) == 1
@@ -815,14 +864,15 @@ _empty_tot = pd.DataFrame([{"vol_total":0}])
 _empty_rap = pd.DataFrame([{"vol_rape":0}])
 
 if solo_internacional:
-    met_df        = _empty_met
-    tot_df        = _empty_tot
-    rape_df       = _empty_rap
-    rank_df       = pd.DataFrame()
-    serie_ab_df   = pd.DataFrame()
-    flujos_df     = pd.DataFrame()
-    sankey_df     = pd.DataFrame()
-    serie_pr_df   = pd.DataFrame()
+    # Solo mostrar internacionales — vaciar todo lo nacional
+    met_df             = _empty_met
+    tot_df             = _empty_tot
+    rape_df            = _empty_rap
+    rank_df            = pd.DataFrame()
+    serie_ab_df        = pd.DataFrame()
+    flujos_df          = pd.DataFrame()
+    sankey_df          = pd.DataFrame()
+    serie_pr_df        = pd.DataFrame()
     precios_central_df = pd.DataFrame()
 else:
     met_df, tot_df, rape_df, rank_df, serie_ab_df, flujos_df, sankey_df = consultar_abast(
@@ -867,7 +917,7 @@ def consultar_internacionales(fecha_ini, fecha_fin, semestre, grupo, rubros,
         df = pd.DataFrame()
     return df
 
-if incluir_intl:
+if incluir_intl and not excluir_intl_por_depto:
     intl_raw = consultar_internacionales(
         fecha_ini, fecha_fin, semestre_sel, grupo_sel, rubros_t,
         centrales_t, paises_t, mtime_intl
@@ -1070,7 +1120,6 @@ elif muns_prio:
 else:
     muns_resalte = set()
 
-# Cuando solo hay INTERNACIONAL no resaltar nada nacional
 top30_map = set() if solo_internacional else top30
 
 def color_fill(codigo, depto):
@@ -1191,7 +1240,7 @@ def render_principal(vol_filtro_total, mun_act, cent_act, precio_prom_general,
             leyenda_intl = '<div class="legend-item"><span class="legend-box" style="background:#00C878;"></span>Flujos internacionales</div>'
         leyenda_territorio = ""
         if muns_resalte:
-            if territorio_sel and muns_prio:
+            if territorio_sel and muns_prio and not territorio_sel == list(muns_prio):
                 label_t = "Municipios SARA (intersección)"
             elif territorio_sel:
                 label_t = "Municipios territorio SARA"
