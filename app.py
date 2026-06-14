@@ -706,7 +706,7 @@ st.markdown("</div>", unsafe_allow_html=True)
 
 # ── Sección SARA — fuera del fragment, interactiva ────────
 with st.expander("**FILTROS DEL PROYECTO SARA**", expanded=False):
-    sc1, sc2, sc3 = st.columns([1.2, 1.5, 2.3])
+    sc1, sc2 = st.columns([1.2, 1.5])
     with sc1:
         solo_priorizados = st.checkbox(
             "Rubros priorizados SARA", value=False,
@@ -723,10 +723,6 @@ with st.expander("**FILTROS DEL PROYECTO SARA**", expanded=False):
             default=[],
             placeholder="Todos los territorios"
         )
-    with sc3:
-        st.markdown('<div style="font-size:0.82rem;color:#9EABC0;padding-top:1.6rem;">🔀 Máx. flujos en mapa</div>', unsafe_allow_html=True)
-        max_flujos = st.slider("Máx. flujos", min_value=100, max_value=2000,
-                               value=MAX_LINEAS_MAPA, step=100, label_visibility="collapsed")
 
 # Aplicar filtro de priorizados al selector de rubros
 if solo_priorizados and not rubros_sel:
