@@ -414,6 +414,9 @@ def consultar_catalogos(mtime_ab, mtime_pr):
         ORDER BY 1
     """).df()["departamento_origen"].tolist()
     deptos = list(dict.fromkeys(deptos_raw))
+    # Agregar INTERNACIONAL como opción especial al final
+    if "INTERNACIONAL" not in deptos:
+        deptos.append("INTERNACIONAL")
     municipios_raw = ca.execute("""
         SELECT DISTINCT municipio_origen, departamento_origen
         FROM lineas WHERE municipio_origen IS NOT NULL
@@ -679,34 +682,39 @@ with f5:
 
 st.markdown('<div style="height:0.4rem;"></div>', unsafe_allow_html=True)
 
-# ── Fila 2: Depto | Municipio | Internacional | Slider ───
-g1, g2, g3, g4 = st.columns([1.3, 1.5, 1.5, 1.2])
+# ── Fila 2: Depto | Municipio | Toggle flujos intl | Slider ─
+g1, g2, g3, g4 = st.columns([1.3, 1.5, 1.0, 1.4])
 with g1:
     deptos_sel = st.multiselect("Depto. origen", deptos, default=[])
 with g2:
-    # Filtrar municipios por depto si hay depto seleccionado
-    if deptos_sel:
+    deptos_sin_intl = [d for d in deptos_sel if d != "INTERNACIONAL"]
+    if deptos_sin_intl:
         muns_opciones = sorted(
-            municipios_df[municipios_df["departamento_origen"].isin(deptos_sel)]["municipio_origen"].unique().tolist()
+            municipios_df[municipios_df["departamento_origen"].isin(deptos_sin_intl)]["municipio_origen"].unique().tolist()
         )
     else:
         muns_opciones = sorted(municipios_df["municipio_origen"].unique().tolist())
     municipios_sel = st.multiselect("Municipio origen", options=muns_opciones,
                                     default=[], placeholder="Todos los municipios")
 with g3:
-    paises_sel = st.multiselect("Origen internacional", options=paises_lista,
-                                default=[], placeholder="Todos los países")
+    st.markdown('<div style="font-size:0.82rem;color:#9EABC0;padding-top:1.6rem;">Flujos intl. en mapa</div>',
+                unsafe_allow_html=True)
+    mostrar_flujos_intl = st.toggle("Flujos internacionales", value=False,
+                                     label_visibility="collapsed")
 with g4:
     st.markdown('<div style="font-size:0.82rem;color:#9EABC0;padding-top:1.6rem;">'
                 '🔀 Máx. flujos en mapa</div>', unsafe_allow_html=True)
     max_flujos = st.slider("Máx. flujos", min_value=100, max_value=2000,
                            value=MAX_LINEAS_MAPA, step=100, label_visibility="collapsed")
 
+# Internacional activo si está en deptos seleccionados o si no hay filtro de depto
+incluir_intl = "INTERNACIONAL" in deptos_sel or not deptos_sel
+
 st.markdown("</div>", unsafe_allow_html=True)
 
 # ── Sección SARA — fuera del fragment, interactiva ────────
 with st.expander("**FILTROS DEL PROYECTO SARA**", expanded=False):
-    sc1, sc2 = st.columns([1.2, 1.5])
+    sc1, sc2, sc3 = st.columns([1.0, 1.2, 1.2])
     with sc1:
         solo_priorizados = st.checkbox(
             "Rubros priorizados SARA", value=False,
@@ -715,14 +723,20 @@ with st.expander("**FILTROS DEL PROYECTO SARA**", expanded=False):
         st.markdown('<div style="font-size:0.8rem;color:#9EABC0;margin-top:0.6rem;">Municipios priorizados</div>', unsafe_allow_html=True)
         prio_oferta  = st.checkbox("Oferta",  value=False, key="prio_oferta")
         prio_demanda = st.checkbox("Demanda", value=False, key="prio_demanda")
+
+    territorios_opciones = sorted(TERRITORIOS_FUNC.keys())
+    mitad = (len(territorios_opciones) + 1) // 2
+    territorio_checks = {}
     with sc2:
-        territorios_opciones = sorted(TERRITORIOS_FUNC.keys())
-        territorio_sel = st.multiselect(
-            "Territorio funcional",
-            options=territorios_opciones,
-            default=[],
-            placeholder="Todos los territorios"
-        )
+        st.markdown('<div style="font-size:0.8rem;color:#9EABC0;margin-bottom:0.3rem;">Territorio funcional</div>', unsafe_allow_html=True)
+        for t in territorios_opciones[:mitad]:
+            territorio_checks[t] = st.checkbox(t, value=False, key=f"terr_{t}")
+    with sc3:
+        st.markdown('<div style="font-size:0.8rem;color:#9EABC0;margin-bottom:0.3rem;">&nbsp;</div>', unsafe_allow_html=True)
+        for t in territorios_opciones[mitad:]:
+            territorio_checks[t] = st.checkbox(t, value=False, key=f"terr_{t}")
+
+territorio_sel = [t for t, v in territorio_checks.items() if v]
 
 # Aplicar filtro de priorizados al selector de rubros
 if solo_priorizados and not rubros_sel:
@@ -750,10 +764,9 @@ else:
     fecha_ini, fecha_fin = fecha_min_g, fecha_max_g
 
 centrales_t   = tuple(centrales_sel)
-deptos_t      = tuple(deptos_sel)
+deptos_t      = tuple([d for d in deptos_sel if d != "INTERNACIONAL"])
 rubros_t      = tuple(rubros_sel)
 municipios_t  = tuple(municipios_sel) if municipios_sel else ()
-paises_t      = tuple(paises_sel) if paises_sel else ()
 muns_prio_t   = tuple(sorted(muns_prio)) if muns_prio else ()
 
 rubro_unico       = rubros_sel[0] if len(rubros_sel) == 1 else None
@@ -815,10 +828,13 @@ def consultar_internacionales(fecha_ini, fecha_fin, semestre, grupo, rubros,
         df = pd.DataFrame()
     return df
 
-intl_raw = consultar_internacionales(
-    fecha_ini, fecha_fin, semestre_sel, grupo_sel, rubros_t,
-    centrales_t, paises_t, mtime_intl
-)
+if incluir_intl:
+    intl_raw = consultar_internacionales(
+        fecha_ini, fecha_fin, semestre_sel, grupo_sel, rubros_t,
+        centrales_t, (), mtime_intl
+    )
+else:
+    intl_raw = pd.DataFrame()
 if not intl_raw.empty:
     intl_raw["lon_orig"] = intl_raw["pais_origen"].str.upper().map(
         {k: v[0] for k, v in PAISES_COORDS.items()})
@@ -854,6 +870,10 @@ mun_act    = _si(met_df, "mun_activos")
 cent_act   = _si(met_df, "cent_activas")
 vol_total  = _sf(tot_df, "vol_total")
 vol_rape   = _sf(rape_df, "vol_rape")
+
+# Sumar toneladas internacionales si están incluidas
+vol_intl = intl_df["toneladas_total"].sum() if not intl_df.empty else 0.0
+vol_filtro_display = vol_filtro + vol_intl
 
 # Precio promedio general — solo válido con un único rubro seleccionado
 precio_prom_general = (
@@ -923,6 +943,29 @@ if not rank_df.empty:
 
     rk = rk.sort_values(["indice","toneladas_total"], ascending=False).reset_index(drop=True)
     rk["ranking"] = rk.index + 1
+
+    # Agregar filas internacionales al ranking para mostrar en tabla
+    if not intl_df.empty:
+        intl_rk = intl_df.groupby("pais_origen", as_index=False).agg(
+            toneladas_total=("toneladas_total","sum"),
+            meses_participacion=("toneladas_total","count"),
+        )
+        intl_rk["municipio_origen"]    = "* " + intl_rk["pais_origen"]
+        intl_rk["departamento_origen"] = "Internacional"
+        intl_rk["cod_municipio"]       = "intl"
+        intl_rk["precio_municipio"]    = np.nan
+        intl_rk["ventaja_precio"]      = np.nan
+        intl_rk["part_filtro"]         = np.where(
+            vol_filtro + intl_df["toneladas_total"].sum() > 0,
+            intl_rk["toneladas_total"] / (vol_filtro + intl_df["toneladas_total"].sum()) * 100, 0)
+        intl_rk["part_total"]  = 0.0
+        intl_rk["part_rape"]   = 0.0
+        intl_rk["frec"]        = 0.0
+        intl_rk["score_vol"]   = 0.0
+        intl_rk["score_act"]   = 0.0
+        intl_rk["indice"]      = np.nan
+        rk = pd.concat([rk, intl_rk[rk.columns.intersection(intl_rk.columns)]], ignore_index=True)
+        rk["ranking"] = range(1, len(rk)+1)
 
     # ── Preparar flujos para mapa ─────────────────────────────
     if not flujos_df.empty:
@@ -1032,56 +1075,82 @@ if not flujos_df.empty:
 # =========================================================
 
 @st.fragment
-def render_principal(vol_filtro, mun_act, cent_act, precio_prom_general,
+def render_principal(vol_filtro_display, mun_act, cent_act, precio_prom_general,
                      geojson_mun, flujos_df, cent_pts, intl_df,
                      serie_ab_df, serie_pr_df, sk_top, nivel_sel,
                      deptos_sel, tiene_rubro_unico, max_flujos, pct_cobertura,
-                     solo_priorizados, prio_oferta, prio_demanda, territorio_sel):
+                     solo_priorizados, prio_oferta, prio_demanda, territorio_sel,
+                     mostrar_flujos_intl):
 
-    col_izq, col_centro, col_der = st.columns([1.0, 3.6, 1.5], gap="small")
+    left_col, center_col, right_col = st.columns([1.05, 3.8, 1.45], gap="small")
 
-    # ── COLUMNA IZQUIERDA: Filtros SARA + Leyenda ─────────
-    with col_izq:
-        st.markdown("""
-        <div style="background:#1A2133;border:1px solid #3D4F6A;border-radius:10px;
-            padding:0.7rem 0.8rem 0.6rem 0.8rem;margin-bottom:0.6rem;">
-        <div style="font-size:0.72rem;color:#7A9CC0;font-weight:600;
-            letter-spacing:0.06em;margin-bottom:0.5rem;">FILTROS SARA</div>
+    # ── IZQUIERDA: Indicadores + estado SARA + Leyenda ────
+    with left_col:
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.markdown('<div class="panel-title">Indicadores principales</div>', unsafe_allow_html=True)
+
+        if tiene_rubro_unico and precio_prom_general is not None:
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-label">Precio promedio</div>
+                <div class="metric-value" style="font-size:1.65rem;">$ {precio_prom_general:,.0f}</div>
+                <div class="metric-small">Mercado filtrado ($/kg)</div>
+            </div>""", unsafe_allow_html=True)
+
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-label">Toneladas abastecidas</div>
+            <div class="metric-value">{vol_filtro_display:,.0f}</div>
+            <div class="metric-small">Periodo filtrado</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Municipios origen activos</div>
+            <div class="metric-value">{mun_act:,}</div>
+            <div class="metric-small">Con flujo válido</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Centrales activas</div>
+            <div class="metric-value">{cent_act}</div>
+            <div class="metric-small">Bajo filtros actuales</div>
+        </div>
         """, unsafe_allow_html=True)
 
-        st.checkbox("Rubros priorizados", value=solo_priorizados,
-                    key="cb_prio_rubros", disabled=True,
-                    help="Activa este filtro en la barra superior")
-        st.markdown('<div style="font-size:0.8rem;color:#9EABC0;margin-top:0.5rem;margin-bottom:0.2rem;">Municipios priorizados</div>', unsafe_allow_html=True)
-        st.checkbox("Oferta",  value=prio_oferta,  key="cb_oferta_d",  disabled=True)
-        st.checkbox("Demanda", value=prio_demanda, key="cb_demanda_d", disabled=True)
+        # Estado filtros SARA activos
+        sara_activo = solo_priorizados or prio_oferta or prio_demanda or bool(territorio_sel)
+        if sara_activo:
+            tags = []
+            if solo_priorizados: tags.append("Rubros priorizados")
+            if prio_oferta:      tags.append("Oferta")
+            if prio_demanda:     tags.append("Demanda")
+            if territorio_sel:   tags.extend(territorio_sel)
+            st.markdown(f"""
+            <div style="background:#1A2133;border:1px solid #3D4F6A;border-radius:8px;
+                padding:0.5rem 0.7rem;margin-bottom:0.5rem;">
+                <div style="font-size:0.7rem;color:#7A9CC0;font-weight:600;margin-bottom:0.3rem;">FILTROS SARA ACTIVOS</div>
+                <div style="font-size:0.78rem;color:#C0D0E8;">{" · ".join(tags)}</div>
+            </div>""", unsafe_allow_html=True)
 
-        if territorio_sel:
-            st.markdown(f'<div style="font-size:0.8rem;color:#9EABC0;margin-top:0.4rem;">Territorio: {", ".join(territorio_sel)}</div>', unsafe_allow_html=True)
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        # Leyenda
-        st.markdown('<div class="panel">', unsafe_allow_html=True)
         st.markdown('<div class="panel-title">Leyenda</div>', unsafe_allow_html=True)
         leyenda_depto = ""
-        if deptos_sel:
+        if deptos_sel and any(d != "INTERNACIONAL" for d in deptos_sel):
             leyenda_depto = '<div class="legend-item"><span class="legend-box" style="background:#B0B8C8;border:1px solid #888;"></span>Munic. depto. filtrado</div>'
+        leyenda_intl = '<div class="legend-item"><span class="legend-box" style="background:#00C878;"></span>Flujos internacionales</div>' if mostrar_flujos_intl and not intl_df.empty else ""
         st.markdown(f"""
         <div class="legend-item"><span class="legend-box" style="background:#6E44FF;"></span>Top 30 abastecedores</div>
         {leyenda_depto}
         <div class="legend-item"><span class="legend-box" style="background:#F5A020;border-radius:50%;"></span>Municipio de origen</div>
         <div class="legend-item"><span class="legend-box" style="background:#F5B041;"></span>Flujos nacionales</div>
-        <div class="legend-item"><span class="legend-box" style="background:#00C878;"></span>Flujos internacionales</div>
+        {leyenda_intl}
         <div class="legend-item"><span class="legend-box" style="background:#00D2FF;"></span>Central mayorista</div>
-        <div class="small-note" style="margin-top:0.5rem;">
-            <b>{max_flujos:,}</b> flujos visibles<br>({pct_cobertura:.0f}% del total)
+        <div class="small-note" style="margin-top:0.75rem;">
+            <b>{max_flujos:,}</b> flujos nacionales visibles ({pct_cobertura:.0f}% del total).
+            Datos internacionales siempre incluidos en tabla e indicadores.
         </div>
         """, unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── COLUMNA CENTRO: Mapa + Serie ──────────────────────
-    with col_centro:
+    # ── CENTRO: Mapa + Serie ──────────────────────────────
+    with center_col:
         st.markdown('<div class="panel-title">Mapa de flujos de abastecimiento</div>', unsafe_allow_html=True)
 
         layers = [pdk.Layer(
@@ -1091,6 +1160,7 @@ def render_principal(vol_filtro, mun_act, cent_act, precio_prom_general,
             get_line_color="properties.line_color",
             line_width_min_pixels=1.0, pickable=True, auto_highlight=True
         )]
+
         if not flujos_df.empty:
             layers.append(pdk.Layer(
                 "ArcLayer", data=flujos_df,
@@ -1101,8 +1171,8 @@ def render_principal(vol_filtro, mun_act, cent_act, precio_prom_general,
                 pickable=True, auto_highlight=True
             ))
             orig_pts = flujos_df.groupby(
-                ["municipio_origen","departamento_origen","cod_municipio"],as_index=False
-            ).agg(lon=("lon_orig","first"),lat=("lat_orig","first"),
+                ["municipio_origen","departamento_origen","cod_municipio"], as_index=False
+            ).agg(lon=("lon_orig","first"), lat=("lat_orig","first"),
                   toneladas_total=("toneladas_total","sum"))
             orig_pts = orig_pts.dropna(subset=["lon","lat"])
             orig_pts["tipo_elemento"] = "Municipio de origen"
@@ -1116,15 +1186,34 @@ def render_principal(vol_filtro, mun_act, cent_act, precio_prom_general,
                 get_fill_color=[245,160,32,180], get_line_color=[255,210,100,220],
                 line_width_min_pixels=1, pickable=True, auto_highlight=True
             ))
-        if not intl_df.empty:
+
+        # Flujos + puntos internacionales (solo si toggle activo)
+        if mostrar_flujos_intl and not intl_df.empty:
             layers.append(pdk.Layer(
                 "ArcLayer", data=intl_df,
                 get_source_position=["lon_orig","lat_orig"],
                 get_target_position=["lon_dest","lat_dest"],
-                get_source_color=[0,200,120,100], get_target_color=[0,240,160,100],
+                get_source_color=[0,200,120,120], get_target_color=[0,240,160,120],
                 get_width="ancho", width_scale=1, width_min_pixels=1,
                 pickable=True, auto_highlight=True
             ))
+            # Geopuntos verdes en origen de países
+            orig_intl = intl_df.groupby("pais_origen", as_index=False).agg(
+                lon=("lon_orig","first"), lat=("lat_orig","first"),
+                toneladas_total=("toneladas_total","sum")
+            ).dropna(subset=["lon","lat"])
+            orig_intl["tipo_elemento"] = "Origen internacional"
+            orig_intl["detalle_1"] = "Pais: "      + orig_intl["pais_origen"].fillna("")
+            orig_intl["detalle_2"] = "Toneladas: " + orig_intl["toneladas_total"].map(formatear_ton)
+            orig_intl["detalle_3"] = ""
+            orig_intl["detalle_4"] = ""
+            layers.append(pdk.Layer(
+                "ScatterplotLayer", data=orig_intl,
+                get_position="[lon, lat]", get_radius=80000,
+                get_fill_color=[0,200,120,200], get_line_color=[0,255,150,255],
+                line_width_min_pixels=2, pickable=True, auto_highlight=True
+            ))
+
         if not cent_pts.empty:
             layers.append(pdk.Layer(
                 "ScatterplotLayer", data=cent_pts,
@@ -1144,7 +1233,6 @@ def render_principal(vol_filtro, mun_act, cent_act, precio_prom_general,
         )
         st.pydeck_chart(deck, use_container_width=True)
 
-        # Serie mensual
         st.markdown('<div class="panel-title" style="margin-top:0.65rem;">Serie mensual — precio y toneladas abastecidas</div>', unsafe_allow_html=True)
         if not serie_ab_df.empty or not serie_pr_df.empty:
             fig = go.Figure()
@@ -1164,7 +1252,7 @@ def render_principal(vol_filtro, mun_act, cent_act, precio_prom_general,
                 ))
             fig.update_layout(
                 template="plotly_dark", paper_bgcolor="#171A21", plot_bgcolor="#171A21",
-                margin=dict(l=15, r=15, t=10, b=10), height=280,
+                margin=dict(l=15, r=15, t=10, b=10), height=300,
                 legend=dict(orientation="h", y=1.08, x=0),
                 xaxis=dict(showgrid=False),
                 yaxis=dict(title="Precio ($/kg)", gridcolor="#2B3240"),
@@ -1174,49 +1262,21 @@ def render_principal(vol_filtro, mun_act, cent_act, precio_prom_general,
         else:
             st.info("No hay datos de serie con los filtros actuales.")
 
-    # ── COLUMNA DERECHA: Indicadores + Sankey ─────────────
-    with col_der:
-        # Indicadores
-        st.markdown('<div class="panel-title">Indicadores</div>', unsafe_allow_html=True)
-        if tiene_rubro_unico and precio_prom_general is not None:
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="metric-label">Precio promedio</div>
-                <div class="metric-value" style="font-size:1.4rem;">$ {precio_prom_general:,.0f}</div>
-                <div class="metric-small">Mercado filtrado ($/kg)</div>
-            </div>""", unsafe_allow_html=True)
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-label">Toneladas abastecidas</div>
-            <div class="metric-value" style="font-size:1.5rem;">{vol_filtro:,.0f}</div>
-            <div class="metric-small">Periodo filtrado</div>
-        </div>
-        <div class="metric-card">
-            <div class="metric-label">Municipios origen</div>
-            <div class="metric-value" style="font-size:1.5rem;">{mun_act:,}</div>
-            <div class="metric-small">Con flujo válido</div>
-        </div>
-        <div class="metric-card">
-            <div class="metric-label">Centrales activas</div>
-            <div class="metric-value" style="font-size:1.5rem;">{cent_act}</div>
-            <div class="metric-small">Bajo filtros actuales</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # Sankey
-        st.markdown(f'<div class="panel-title" style="margin-top:0.65rem;">Flujos hacia centrales<br>'
-                    f'<span style="font-weight:400;font-size:0.78rem;color:#AEB9C9;">{nivel_sel}</span></div>',
+    # ── DERECHA: Sankey ───────────────────────────────────
+    with right_col:
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.markdown(f'<div class="panel-title">Flujos hacia centrales mayoristas<br>'
+                    f'<span style="font-weight:400;font-size:0.82rem;color:#AEB9C9;">{nivel_sel}</span></div>',
                     unsafe_allow_html=True)
         if not sk_top.empty:
-            fig_sk = construir_sankey(sk_top)
-            fig_sk.update_layout(height=500)
-            st.plotly_chart(fig_sk, use_container_width=True)
+            st.plotly_chart(construir_sankey(sk_top), use_container_width=True)
         else:
-            st.info("Sin datos suficientes.")
+            st.info("No hay datos suficientes.")
+        st.markdown('</div>', unsafe_allow_html=True)
 
 
 render_principal(
-    vol_filtro=vol_filtro, mun_act=mun_act, cent_act=cent_act,
+    vol_filtro_display=vol_filtro_display, mun_act=mun_act, cent_act=cent_act,
     precio_prom_general=precio_prom_general,
     geojson_mun=geojson_mun, flujos_df=flujos_df, cent_pts=cent_pts,
     intl_df=intl_df,
@@ -1226,7 +1286,8 @@ render_principal(
     max_flujos=max_flujos, pct_cobertura=pct_cobertura,
     solo_priorizados=solo_priorizados,
     prio_oferta=prio_oferta, prio_demanda=prio_demanda,
-    territorio_sel=territorio_sel
+    territorio_sel=territorio_sel,
+    mostrar_flujos_intl=mostrar_flujos_intl
 )
 
 # =========================================================
