@@ -38,6 +38,91 @@ DEPTOS_RAPE = {
 MAX_FILAS_TABLA = 300
 MAX_LINEAS_MAPA = 600
 
+# ── Etiquetas legibles para rubros ────────────────────────
+RUBROS_LABEL = {
+    "Acelga_espinaca": "Acelga y espinaca",
+    "Aguacate": "Aguacate",
+    "Ahuyama": "Ahuyama",
+    "Ajo": "Ajo",
+    "Apio_perejil": "Apio y perejil",
+    "Arracacha": "Arracacha",
+    "Arroz": "Arroz",
+    "Arveja": "Arveja",
+    "Banano": "Banano",
+    "Berenjena": "Berenjena",
+    "Brocoli_coliflor": "Brócoli y coliflor",
+    "Calabacin_calabaza": "Calabacín y calabaza",
+    "Carne_cerdo": "Carne de cerdo",
+    "Carne_pollo": "Carne de pollo",
+    "Carne_res": "Carne de res",
+    "Carnes_grupo": "Carnes (grupo)",
+    "Cebolla_cabezona": "Cebolla cabezona",
+    "Cebolla_larga": "Cebolla larga",
+    "Cerdo_en_pie": "Cerdo en pie",
+    "Chocolo": "Chócolo",
+    "Cilantro": "Cilantro",
+    "Ciruela": "Ciruela",
+    "Curuba": "Curuba",
+    "Durazno": "Durazno",
+    "Fresa": "Fresa",
+    "Frijol": "Fríjol",
+    "Frutas_otras_frescas": "Frutas frescas otras",
+    "Gallina_en_pie": "Gallina en pie",
+    "Granadilla": "Granadilla",
+    "Granos_cereales_grupo": "Granos y cereales (grupo)",
+    "Guanabana": "Guanábana",
+    "Guayaba": "Guayaba",
+    "Gulupa_pitahaya": "Gulupa y pitahaya",
+    "Habichuela": "Habichuela",
+    "Huevos": "Huevos",
+    "Kiwi": "Kiwi",
+    "Lacteos_huevos_grupo": "Lácteos y huevos (grupo)",
+    "Leche": "Leche",
+    "Lechuga": "Lechuga",
+    "Lenteja_garbanzo": "Lenteja y garbanzo",
+    "Limon": "Limón",
+    "Lulo": "Lulo",
+    "Maiz": "Maíz",
+    "Mandarina": "Mandarina",
+    "Mango": "Mango",
+    "Manzana": "Manzana",
+    "Maracuya": "Maracuyá",
+    "Mariscos": "Mariscos",
+    "Melon_patilla": "Melón y patilla",
+    "Mora": "Mora",
+    "Name": "Ñame",
+    "Naranja": "Naranja",
+    "Panela": "Panela",
+    "Papa": "Papa",
+    "Papaya": "Papaya",
+    "Pepino": "Pepino",
+    "Pera": "Pera",
+    "Pescado": "Pescado",
+    "Pimenton": "Pimentón",
+    "Pina": "Piña",
+    "Platano": "Plátano",
+    "Procesados_grupo": "Procesados (grupo)",
+    "Quesos_cuajadas": "Quesos y cuajadas",
+    "Remolacha": "Remolacha",
+    "Repollo": "Repollo",
+    "Res_en_pie": "Res en pie",
+    "Tangelo": "Tangelo",
+    "Tomate": "Tomate",
+    "Tomate_de_arbol": "Tomate de árbol",
+    "Tuberculos_otros": "Tubérculos otros",
+    "Uchuva": "Uchuva",
+    "Ulluco": "Ulluco",
+    "Uva": "Uva",
+    "Verduras_otras_frescas": "Verduras frescas otras",
+    "Yuca": "Yuca",
+    "Zanahoria": "Zanahoria",
+}
+# Inverso: etiqueta → código interno
+LABEL_RUBROS = {v: k for k, v in RUBROS_LABEL.items()}
+
+def label_rubro(codigo): return RUBROS_LABEL.get(codigo, codigo)
+def codigo_rubro(lbl):   return LABEL_RUBROS.get(lbl, lbl)
+
 # ── Rubros priorizados SARA (37 tras separación lácteos) ──
 RUBROS_PRIORIZADOS_SARA = {
     "Aguacate","Ahuyama","Arracacha","Arroz","Arveja","Banano",
@@ -66,32 +151,32 @@ MUNS_DEMANDA = {
 MUNS_AMBOS = MUNS_OFERTA & MUNS_DEMANDA
 
 TERRITORIOS_FUNC = {
-    "Bogotá, D.C.":    ['11001'],
-    "Norte":           ['25126','25154','25175','25178','25181','25258','25293',
-                        '25307','25312','25317','25320','25326','25372','25438',
-                        '25513','25662','25875'],
-    "Noroccidental":   ['25148','25214','25260','25269','25279','25335','25402',
-                        '25407','25430','25473','25483','25535','25572','25599',
-                        '25612','25754','25769','25779','25785','25793','25797',
-                        '25815','25817','25823','25839','25841','25843','25845',
-                        '25851','25857','25867','25871','25873','25875','25877',
-                        '25885','25899'],
-    "Occidental":      ['25019','25040','25086','25095','25099','25151','25168',
-                        '25183','25200','25245','25258','25281','25290','25297',
-                        '25322','25377','25386','25430','25438','25513','25649',
-                        '25662','25743','25754','25843','25899'],
-    "Oriente - Llanos":['25151','25178','25281','25524','25599','25649'],
-    "Oriente Guavio":  ['25181','25279','25293','25312','25318','25326','25430',
-                        '25592','25612','25743','25769','25779','25793','25797',
-                        '25823','25839','25841','25851','25857','25867','25871',
-                        '25873','25877','25885'],
-    "Suroccidental":   ['25001','25035','25053','25126','25154','25175','25245',
-                        '25258','25281','25286','25290','25297','25307','25320',
-                        '25322','25377','25386','25430','25438','25473','25513',
-                        '25535','25572','25599','25612','25649','25662','25743',
-                        '25754','25769','25779','25785','25793','25817','25823',
-                        '25839','25843','25845','25851','25857','25867','25873',
-                        '25875','25877','25885','25899'],
+    "Bogotá, D.C.":     ['11001'],
+    "Norte":            ['25126','25154','25175','25178','25181','25258','25293',
+                         '25307','25312','25317','25320','25326','25372','25438',
+                         '25513','25662','25875'],
+    "Noroccidental":    ['25148','25214','25260','25269','25279','25335','25402',
+                         '25407','25430','25473','25483','25535','25572','25599',
+                         '25612','25754','25769','25779','25785','25793','25797',
+                         '25815','25817','25823','25839','25841','25843','25845',
+                         '25851','25857','25867','25871','25873','25875','25877',
+                         '25885','25899'],
+    "Occidental":       ['25019','25040','25086','25095','25099','25151','25168',
+                         '25183','25200','25245','25258','25281','25290','25297',
+                         '25322','25377','25386','25430','25438','25513','25649',
+                         '25662','25743','25754','25843','25899'],
+    "Oriente - Llanos": ['25151','25178','25281','25524','25599','25649'],
+    "Oriente Guavio":   ['25181','25279','25293','25312','25318','25326','25430',
+                         '25592','25612','25743','25769','25779','25793','25797',
+                         '25823','25839','25841','25851','25857','25867','25871',
+                         '25873','25877','25885'],
+    "Suroccidental":    ['25001','25035','25053','25126','25154','25175','25245',
+                         '25258','25281','25286','25290','25297','25307','25320',
+                         '25322','25377','25386','25430','25438','25473','25513',
+                         '25535','25572','25599','25612','25649','25662','25743',
+                         '25754','25769','25779','25785','25793','25817','25823',
+                         '25839','25843','25845','25851','25857','25867','25873',
+                         '25875','25877','25885','25899'],
 }
 
 # ── Coordenadas de países de origen internacional ─────────
@@ -292,8 +377,7 @@ def get_con_abast(mtime):
             CAST(lon_mun AS DOUBLE)                         AS lon_mun,
             CAST(lat_mun AS DOUBLE)                         AS lat_mun,
             CAST(toneladas AS DOUBLE)                       AS toneladas,
-            CAST(dias_con_datos AS DOUBLE)                  AS dias_con_datos,
-            FALSE                                           AS es_internacional
+            CAST(dias_con_datos AS DOUBLE)                  AS dias_con_datos
         FROM read_parquet('{RUTA_LINEAS_SQL}')
     """)
     return con
@@ -384,11 +468,11 @@ def build_where_ab(fecha_ini, fecha_fin, semestre, grupo, rubros, centrales, dep
     elif semestre == "Segundo semestre": c.append("mes BETWEEN 7 AND 12")
     if rubros:
         c.append(f"rubro IN ({','.join(['?']*len(rubros))})"); p.extend(list(rubros))
-    elif grupo and grupo not in ("Todos", "⭐ Priorizados SARA"):
-        c.append("grupo = ?"); p.append(grupo)
     elif grupo == "⭐ Priorizados SARA":
-        rubros_prio = list(RUBROS_PRIORIZADOS_SARA)
-        c.append(f"rubro IN ({','.join(['?']*len(rubros_prio))})"); p.extend(rubros_prio)
+        rp = list(RUBROS_PRIORIZADOS_SARA)
+        c.append(f"rubro IN ({','.join(['?']*len(rp))})"); p.extend(rp)
+    elif grupo and grupo != "Todos":
+        c.append("grupo = ?"); p.append(grupo)
     if centrales:
         c.append(f"central_mayorista IN ({','.join(['?']*len(centrales))})"); p.extend(list(centrales))
     if deptos:
@@ -401,8 +485,8 @@ def build_where_ab(fecha_ini, fecha_fin, semestre, grupo, rubros, centrales, dep
         deptos_norm = list(set(deptos_norm))
         c.append(f"departamento_origen IN ({','.join(['?']*len(deptos_norm))})"); p.extend(deptos_norm)
     if muns_prio:
-        muns_list = list(muns_prio)
-        c.append(f"cod_municipio IN ({','.join(['?']*len(muns_list))})"); p.extend(muns_list)
+        ml = list(muns_prio)
+        c.append(f"cod_municipio IN ({','.join(['?']*len(ml))})"); p.extend(ml)
     return " AND ".join(c), p
 
 def build_where_pr(fecha_ini, fecha_fin, semestre, grupo, rubros, centrales):
@@ -511,47 +595,6 @@ def consultar_abast(fecha_ini, fecha_fin, semestre, grupo, rubro,
 # =========================================================
 
 @st.cache_data(show_spinner=False)
-def consultar_internacionales(fecha_ini, fecha_fin, semestre, grupo, rubros,
-                               centrales_t, mtime):
-    """Consulta datos de abastecimiento de origen internacional."""
-    con = get_con_abast(mtime)
-
-    # Build WHERE sin filtro de municipio (los internacionales no tienen cod_municipio válido)
-    c = ["fecha_mes BETWEEN ? AND ?", "fecha_mes <= '2026-03-01'",
-         "cod_municipio NOT REGEXP '^[0-9]{5}$'"]  # solo internacionales
-    p = [fecha_ini.isoformat(), fecha_fin.isoformat()]
-    if semestre == "Primer semestre":    c.append("mes BETWEEN 1 AND 6")
-    elif semestre == "Segundo semestre": c.append("mes BETWEEN 7 AND 12")
-    if rubros:
-        c.append(f"rubro IN ({','.join(['?']*len(rubros))})"); p.extend(list(rubros))
-    elif grupo and grupo not in ("Todos","⭐ Priorizados SARA"):
-        c.append("grupo = ?"); p.append(grupo)
-    elif grupo == "⭐ Priorizados SARA":
-        rp = list(RUBROS_PRIORIZADOS_SARA)
-        c.append(f"rubro IN ({','.join(['?']*len(rp))})"); p.extend(rp)
-    if centrales_t:
-        c.append(f"central_mayorista IN ({','.join(['?']*len(centrales_t))})"); p.extend(list(centrales_t))
-    w = " AND ".join(c)
-
-    try:
-        df = con.execute(f"""
-            SELECT
-                municipio_origen AS pais_origen,
-                departamento_origen,
-                central_mayorista,
-                AVG(lon_central) AS lon_dest,
-                AVG(lat_central) AS lat_dest,
-                SUM(toneladas)   AS toneladas_total,
-                COUNT(DISTINCT etiqueta_mes) AS meses
-            FROM lineas
-            WHERE {w}
-            GROUP BY 1,2,3
-            ORDER BY toneladas_total DESC
-        """, p).df()
-    except Exception:
-        df = pd.DataFrame()
-    return df
-
 @st.cache_data(show_spinner=False)
 def consultar_precios(fecha_ini, fecha_fin, semestre, grupo, rubro,
                       centrales_t, mtime_pr):
@@ -630,16 +673,21 @@ with f1:
     grupo_sel = st.selectbox("Grupo", grupos_opciones, index=0)
 with f2:
     if grupo_sel == "⭐ Priorizados SARA":
-        rubros_f = sorted(RUBROS_PRIORIZADOS_SARA)
+        rubros_f_codigos = sorted(RUBROS_PRIORIZADOS_SARA)
     elif grupo_sel != "Todos":
         con_tmp = get_con_abast(mtime_ab)
-        rubros_f = con_tmp.execute(
+        rubros_f_codigos = con_tmp.execute(
             "SELECT DISTINCT rubro FROM lineas WHERE grupo=? AND rubro IS NOT NULL ORDER BY rubro",
             [grupo_sel]
         ).df()["rubro"].tolist()
     else:
-        rubros_f = rubros
-    rubros_sel = st.multiselect("Rubro", options=rubros_f, default=[], placeholder="Todos los rubros")
+        rubros_f_codigos = rubros
+    # Mostrar etiquetas legibles
+    rubros_f_labels = sorted([label_rubro(r) for r in rubros_f_codigos])
+    rubros_sel_labels = st.multiselect("Rubro", options=rubros_f_labels,
+                                       default=[], placeholder="Todos los rubros")
+    # Convertir etiquetas de vuelta a códigos internos
+    rubros_sel = [codigo_rubro(l) for l in rubros_sel_labels]
 with f3:
     centrales_sel = st.multiselect("Central mayorista", options=centrales, default=[])
 with f4:
@@ -650,15 +698,15 @@ with f6:
     rango = st.date_input("Fechas", value=(fecha_min_g, fecha_max_g),
                           min_value=fecha_min_g, max_value=fecha_max_g)
 
-# ── Filtros secundarios: municipios priorizados + slider ──
+# ── Filtros secundarios ───────────────────────────────────
 f7, f8 = st.columns([2, 3])
 with f7:
     st.markdown('<div style="font-size:0.82rem;color:#9EABC0;padding-top:0.5rem;">Municipios priorizados SARA</div>', unsafe_allow_html=True)
     fc1, fc2 = st.columns(2)
     with fc1:
         prio_tipo = st.selectbox(
-            "Tipo priorización",
-            ["Todos","Solo oferta","Solo demanda","Oferta y demanda"],
+            "Priorización",
+            ["Todos", "Oferta", "Demanda", "Oferta y demanda"],
             index=0, label_visibility="collapsed"
         )
     with fc2:
@@ -680,9 +728,9 @@ with f8:
 st.markdown("</div>", unsafe_allow_html=True)
 
 # ── Resolver filtro de municipios priorizados ─────────────
-if prio_tipo == "Solo oferta":
+if prio_tipo == "Oferta":
     muns_prio = MUNS_OFERTA
-elif prio_tipo == "Solo demanda":
+elif prio_tipo == "Demanda":
     muns_prio = MUNS_DEMANDA
 elif prio_tipo == "Oferta y demanda":
     muns_prio = MUNS_AMBOS
@@ -705,13 +753,11 @@ deptos_t      = tuple(deptos_sel)
 rubros_t      = tuple(rubros_sel)
 muns_prio_t   = tuple(sorted(muns_prio)) if muns_prio else ()
 
-# Para compatibilidad con lógica de precio: solo válido cuando hay exactamente 1 rubro
-rubro_unico = rubros_sel[0] if len(rubros_sel) == 1 else None
+rubro_unico       = rubros_sel[0] if len(rubros_sel) == 1 else None
 tiene_rubro_unico = len(rubros_sel) == 1
 
-# Etiqueta para el Sankey y título
 if len(rubros_sel) == 1:
-    nivel_sel = rubros_sel[0]
+    nivel_sel = label_rubro(rubros_sel[0])
 elif len(rubros_sel) > 1:
     nivel_sel = f"{len(rubros_sel)} rubros seleccionados"
 elif grupo_sel == "⭐ Priorizados SARA":
@@ -735,34 +781,67 @@ serie_pr_df, precios_central_df = consultar_precios(
     centrales_t, mtime_pr
 )
 
-# Datos internacionales
-intl_df = consultar_internacionales(
+# ── Datos internacionales ─────────────────────────────────
+@st.cache_data(show_spinner=False)
+def consultar_internacionales(fecha_ini, fecha_fin, semestre, grupo, rubros,
+                               centrales_t, mtime):
+    con = get_con_abast(mtime)
+    c = ["fecha_mes BETWEEN ? AND ?", "fecha_mes <= '2026-03-01'",
+         "LENGTH(cod_municipio) != 5 OR cod_municipio SIMILAR TO '[^0-9]+'"]
+    p = [fecha_ini.isoformat(), fecha_fin.isoformat()]
+    if semestre == "Primer semestre":    c.append("mes BETWEEN 1 AND 6")
+    elif semestre == "Segundo semestre": c.append("mes BETWEEN 7 AND 12")
+    if rubros:
+        c.append(f"rubro IN ({','.join(['?']*len(rubros))})"); p.extend(list(rubros))
+    elif grupo == "⭐ Priorizados SARA":
+        rp = list(RUBROS_PRIORIZADOS_SARA)
+        c.append(f"rubro IN ({','.join(['?']*len(rp))})"); p.extend(rp)
+    elif grupo and grupo != "Todos":
+        c.append("grupo = ?"); p.append(grupo)
+    if centrales_t:
+        c.append(f"central_mayorista IN ({','.join(['?']*len(centrales_t))})"); p.extend(list(centrales_t))
+    w = " AND ".join(c)
+    try:
+        df = con.execute(f"""
+            SELECT municipio_origen AS pais_origen,
+                   central_mayorista,
+                   AVG(lon_central) AS lon_dest,
+                   AVG(lat_central) AS lat_dest,
+                   SUM(toneladas)   AS toneladas_total
+            FROM lineas WHERE {w}
+            GROUP BY 1,2 ORDER BY toneladas_total DESC
+        """, p).df()
+    except Exception:
+        df = pd.DataFrame()
+    return df
+
+intl_raw = consultar_internacionales(
     fecha_ini, fecha_fin, semestre_sel, grupo_sel, rubros_t,
     centrales_t, mtime_ab
 )
 
-# Asignar coordenadas de países
-if not intl_df.empty:
-    intl_df["lon_orig"] = intl_df["pais_origen"].map(
+# Asignar coordenadas y preparar arcos
+if not intl_raw.empty:
+    intl_raw["lon_orig"] = intl_raw["pais_origen"].str.upper().map(
         {k: v[0] for k, v in PAISES_COORDS.items()}
     )
-    intl_df["lat_orig"] = intl_df["pais_origen"].map(
+    intl_raw["lat_orig"] = intl_raw["pais_origen"].str.upper().map(
         {k: v[1] for k, v in PAISES_COORDS.items()}
     )
-    intl_df = intl_df.dropna(subset=["lon_orig","lat_orig","lon_dest","lat_dest"])
-    vol_intl_total = intl_df["toneladas_total"].sum()
-    if not intl_df.empty and vol_intl_total > 0:
-        intl_df["pct_total"] = intl_df["toneladas_total"] / vol_intl_total * 100
-        vmin_i = intl_df["toneladas_total"].min()
-        vmax_i = intl_df["toneladas_total"].max()
-        intl_df["ancho"] = 2 + 8 * (
-            (intl_df["toneladas_total"] - vmin_i) / (vmax_i - vmin_i + 1e-9)
-        )
+    intl_df = intl_raw.dropna(subset=["lon_orig","lat_orig","lon_dest","lat_dest"]).copy()
+    if not intl_df.empty:
+        vol_i = intl_df["toneladas_total"].sum()
+        intl_df["pct_intl"] = intl_df["toneladas_total"] / vol_i * 100
+        vi_min = intl_df["toneladas_total"].min()
+        vi_max = intl_df["toneladas_total"].max()
+        intl_df["ancho"] = 2 + 8*((intl_df["toneladas_total"]-vi_min)/(vi_max-vi_min+1e-9))
         intl_df["tipo_elemento"] = "Origen internacional"
-        intl_df["detalle_1"] = "Pais: " + intl_df["pais_origen"].fillna("")
-        intl_df["detalle_2"] = "Central: " + intl_df["central_mayorista"].fillna("")
+        intl_df["detalle_1"] = "Pais: "      + intl_df["pais_origen"].fillna("")
+        intl_df["detalle_2"] = "Central: "   + intl_df["central_mayorista"].fillna("")
         intl_df["detalle_3"] = "Toneladas: " + intl_df["toneladas_total"].map(formatear_ton)
-        intl_df["detalle_4"] = "Part. vol. intl: " + intl_df["pct_total"].map("{:.1f}%".format)
+        intl_df["detalle_4"] = "% vol. intl: " + intl_df["pct_intl"].map("{:.1f}%".format)
+else:
+    intl_df = pd.DataFrame()
 
 # =========================================================
 # ESCALARES
@@ -1002,9 +1081,7 @@ def render_principal(vol_filtro, mun_act, cent_act, precio_prom_general,
         <div class="small-note" style="margin-top:0.75rem;">
             <b>Flujos visibles:</b> se muestran los <b>{max_flujos:,}</b> principales flujos
             origen-destino por volumen, representando el <b>{pct_cobertura:.0f}%</b> del total
-            abastecido bajo los filtros activos.<br>
-            Los graficos y la tabla siempre reflejan el <b>total</b> de registros,
-            independientemente de este parametro.
+            abastecido bajo los filtros activos.
         </div>
         """, unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
@@ -1054,7 +1131,7 @@ def render_principal(vol_filtro, mun_act, cent_act, precio_prom_general,
                 "ArcLayer", data=intl_df,
                 get_source_position=["lon_orig","lat_orig"],
                 get_target_position=["lon_dest","lat_dest"],
-                get_source_color=[0,200,120,200], get_target_color=[0,240,160,200],
+                get_source_color=[0,200,120,210], get_target_color=[0,240,160,210],
                 get_width="ancho", width_scale=1, width_min_pixels=1,
                 pickable=True, auto_highlight=True
             ))
