@@ -690,14 +690,30 @@ st.markdown('<div style="height:0.4rem;"></div>', unsafe_allow_html=True)
 # ── Fila 2: Depto | Municipio | País | Toggle | Slider ───
 g1, g2, g3, g4, g5 = st.columns([1.1, 1.2, 1.2, 0.9, 1.0])
 with g1:
-    deptos_sel = st.multiselect("Depto. origen", deptos, default=[])
+    # Calcular deptos permitidos si hay filtro SARA activo
+    _muns_prio_temp2 = None
+    if prio_oferta and prio_demanda:   _muns_prio_temp2 = MUNS_AMBOS
+    elif prio_oferta:                  _muns_prio_temp2 = MUNS_OFERTA
+    elif prio_demanda:                 _muns_prio_temp2 = MUNS_DEMANDA
+    if territorio_sel:
+        _muns_terr2 = set()
+        for t in territorio_sel: _muns_terr2.update(TERRITORIOS_FUNC.get(t, []))
+        _muns_prio_temp2 = (_muns_prio_temp2 & _muns_terr2) if _muns_prio_temp2 else _muns_terr2
+    if _muns_prio_temp2 and "cod_municipio" in municipios_df.columns:
+        _deptos_prio = set(
+            municipios_df[municipios_df["cod_municipio"].astype(str).isin(_muns_prio_temp2)]["departamento_origen"].str.upper().tolist()
+        )
+        deptos_opciones = [d for d in deptos if d.upper() in _deptos_prio or d == "INTERNACIONAL"]
+    else:
+        deptos_opciones = deptos
+    deptos_sel = st.multiselect("Depto. origen", deptos_opciones, default=[])
 with g2:
     deptos_sin_intl = [d for d in deptos_sel if d != "INTERNACIONAL"]
     if deptos_sin_intl:
         muns_base = municipios_df[municipios_df["departamento_origen"].isin(deptos_sin_intl)]["municipio_origen"].unique().tolist()
     else:
         muns_base = municipios_df["municipio_origen"].unique().tolist()
-    # Filtrar por priorizados SARA si hay filtro activo (usando vars leídas de session_state)
+    # Filtrar municipios por SARA — misma lógica
     _muns_prio_temp = None
     if prio_oferta and prio_demanda:   _muns_prio_temp = MUNS_AMBOS
     elif prio_oferta:                  _muns_prio_temp = MUNS_OFERTA
@@ -706,10 +722,9 @@ with g2:
         _muns_terr = set()
         for t in territorio_sel: _muns_terr.update(TERRITORIOS_FUNC.get(t, []))
         _muns_prio_temp = (_muns_prio_temp & _muns_terr) if _muns_prio_temp else _muns_terr
-    if _muns_prio_temp:
+    if _muns_prio_temp and "cod_municipio" in municipios_df.columns:
         muns_prio_nombres = set(
             municipios_df[municipios_df["cod_municipio"].astype(str).isin(_muns_prio_temp)]["municipio_origen"].tolist()
-            if "cod_municipio" in municipios_df.columns else []
         )
         muns_base = [m for m in muns_base if m in muns_prio_nombres] or muns_base
     muns_opciones = sorted(muns_base)
@@ -788,6 +803,9 @@ municipios_t  = tuple(municipios_sel) if municipios_sel else ()
 paises_t      = tuple(paises_sel) if paises_sel else ()
 muns_prio_t   = tuple(sorted(muns_prio)) if muns_prio else ()
 
+# Solo INTERNACIONAL seleccionado — no ejecutar consultas nacionales
+solo_internacional = bool(deptos_sel) and all(d == "INTERNACIONAL" for d in deptos_sel) and not municipios_sel
+
 incluir_intl = (
     "INTERNACIONAL" in deptos_sel
     or bool(paises_sel)
@@ -810,15 +828,26 @@ else:
 # CONSULTAS
 # =========================================================
 
-met_df, tot_df, rape_df, rank_df, serie_ab_df, flujos_df, sankey_df = consultar_abast(
-    fecha_ini, fecha_fin, semestre_sel, grupo_sel, rubros_t,
-    centrales_t, deptos_t, muns_prio_t, municipios_t, mtime_ab
-)
-
-serie_pr_df, precios_central_df = consultar_precios(
-    fecha_ini, fecha_fin, semestre_sel, grupo_sel, rubros_t,
-    centrales_t, mtime_pr
-)
+if solo_internacional:
+    # Vaciar todos los resultados nacionales
+    met_df = pd.DataFrame([{"vol_filtro": 0, "mun_activos": 0, "cent_activas": 0}])
+    tot_df = pd.DataFrame([{"vol_total": 0}])
+    rape_df = pd.DataFrame([{"vol_rape": 0}])
+    rank_df = pd.DataFrame()
+    serie_ab_df = pd.DataFrame()
+    flujos_df = pd.DataFrame()
+    sankey_df = pd.DataFrame()
+    serie_pr_df = pd.DataFrame()
+    precios_central_df = pd.DataFrame()
+else:
+    met_df, tot_df, rape_df, rank_df, serie_ab_df, flujos_df, sankey_df = consultar_abast(
+        fecha_ini, fecha_fin, semestre_sel, grupo_sel, rubros_t,
+        centrales_t, deptos_t, muns_prio_t, municipios_t, mtime_ab
+    )
+    serie_pr_df, precios_central_df = consultar_precios(
+        fecha_ini, fecha_fin, semestre_sel, grupo_sel, rubros_t,
+        centrales_t, mtime_pr
+    )
 
 # ── Datos internacionales ─────────────────────────────────
 @st.cache_data(show_spinner=False)
@@ -899,10 +928,6 @@ vol_rape   = _sf(rape_df, "vol_rape")
 # Toneladas internacionales — se suman si hay datos intl activos
 vol_intl         = intl_df["toneladas_total"].sum() if not intl_df.empty else 0.0
 vol_filtro_total = vol_filtro + vol_intl
-
-# Si solo se seleccionó INTERNACIONAL en deptos, ocultar flujos nacionales del mapa
-if deptos_sel and all(d == "INTERNACIONAL" for d in deptos_sel):
-    flujos_df = pd.DataFrame()
 
 # Precio promedio general — solo válido con un único rubro seleccionado
 precio_prom_general = (
@@ -1060,9 +1085,12 @@ elif muns_prio:
 else:
     muns_resalte = set()
 
+# Si solo INTERNACIONAL, no resaltar nada nacional
+top30_map = set() if solo_internacional else top30
+
 def color_fill(codigo, depto):
     cod = str(codigo)
-    if cod in top30:
+    if cod in top30_map:
         return [110, 68, 255, 160]
     if muns_resalte and cod in muns_resalte:
         return [180, 190, 210, 70]
@@ -1072,7 +1100,7 @@ def color_fill(codigo, depto):
 
 def color_line(codigo, depto):
     cod = str(codigo)
-    if cod in top30:
+    if cod in top30_map:
         return [170, 130, 255, 240]
     if muns_resalte and cod in muns_resalte:
         return [210, 220, 240, 230]
