@@ -371,6 +371,32 @@ def get_con_precios(mtime):
 # CATALOGOS
 # =========================================================
 
+@st.cache_resource(show_spinner=False)
+def get_con_intl(mtime):
+    con = duckdb.connect(database=":memory:")
+    con.execute("PRAGMA threads=4")
+    if RUTA_INTERNACIONALES.exists():
+        con.execute(f"""
+            CREATE OR REPLACE VIEW internacionales AS
+            SELECT
+                CAST(fecha_mes AS DATE)                         AS fecha_mes,
+                MONTH(CAST(fecha_mes AS DATE))                  AS mes,
+                CASE WHEN MONTH(CAST(fecha_mes AS DATE)) BETWEEN 1 AND 6
+                     THEN 'Primer semestre' ELSE 'Segundo semestre' END AS semestre,
+                STRFTIME(CAST(fecha_mes AS DATE),'%Y-%m')       AS etiqueta_mes,
+                TRIM(CAST(grupo AS VARCHAR))                    AS grupo,
+                TRIM(CAST(rubro AS VARCHAR))                    AS rubro,
+                TRIM(CAST(central_mayorista AS VARCHAR))        AS central_mayorista,
+                UPPER(TRIM(CAST(pais_origen AS VARCHAR)))       AS pais_origen,
+                CAST(lon_orig AS DOUBLE)                        AS lon_orig,
+                CAST(lat_orig AS DOUBLE)                        AS lat_orig,
+                CAST(lon_dest AS DOUBLE)                        AS lon_dest,
+                CAST(lat_dest AS DOUBLE)                        AS lat_dest,
+                CAST(toneladas AS DOUBLE)                       AS toneladas
+            FROM read_parquet('{RUTA_INTL_SQL}')
+        """)
+    return con
+
 @st.cache_data(show_spinner=False)
 def consultar_catalogos(mtime_ab, mtime_pr):
     ca = get_con_abast(mtime_ab)
@@ -731,32 +757,6 @@ serie_pr_df, precios_central_df = consultar_precios(
 )
 
 # ── Datos internacionales ─────────────────────────────────
-@st.cache_data(show_spinner=False)
-@st.cache_resource(show_spinner=False)
-def get_con_intl(mtime):
-    con = duckdb.connect(database=":memory:")
-    con.execute("PRAGMA threads=4")
-    con.execute(f"""
-        CREATE OR REPLACE VIEW internacionales AS
-        SELECT
-            CAST(fecha_mes AS DATE)                         AS fecha_mes,
-            MONTH(CAST(fecha_mes AS DATE))                  AS mes,
-            CASE WHEN MONTH(CAST(fecha_mes AS DATE)) BETWEEN 1 AND 6
-                 THEN 'Primer semestre' ELSE 'Segundo semestre' END AS semestre,
-            STRFTIME(CAST(fecha_mes AS DATE),'%Y-%m')       AS etiqueta_mes,
-            TRIM(CAST(grupo AS VARCHAR))                    AS grupo,
-            TRIM(CAST(rubro AS VARCHAR))                    AS rubro,
-            TRIM(CAST(central_mayorista AS VARCHAR))        AS central_mayorista,
-            UPPER(TRIM(CAST(pais_origen AS VARCHAR)))       AS pais_origen,
-            CAST(lon_orig AS DOUBLE)                        AS lon_orig,
-            CAST(lat_orig AS DOUBLE)                        AS lat_orig,
-            CAST(lon_dest AS DOUBLE)                        AS lon_dest,
-            CAST(lat_dest AS DOUBLE)                        AS lat_dest,
-            CAST(toneladas AS DOUBLE)                       AS toneladas
-        FROM read_parquet('{RUTA_INTL_SQL}')
-    """)
-    return con
-
 @st.cache_data(show_spinner=False)
 def consultar_internacionales(fecha_ini, fecha_fin, semestre, grupo, rubros,
                                centrales_t, paises_t, mtime_intl):
