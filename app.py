@@ -566,9 +566,10 @@ def consultar_precios(fecha_ini, fecha_fin, semestre, grupo, rubro,
 # CARGA INICIAL
 # =========================================================
 
-mtime_ab  = obtener_mtime(RUTA_LINEAS)
-mtime_pr  = obtener_mtime(RUTA_PRECIOS)
-mtime_mun = obtener_mtime(RUTA_MUNICIPIOS)
+mtime_ab   = obtener_mtime(RUTA_LINEAS)
+mtime_pr   = obtener_mtime(RUTA_PRECIOS)
+mtime_mun  = obtener_mtime(RUTA_MUNICIPIOS)
+mtime_intl = obtener_mtime(RUTA_INTERNACIONALES)
 
 municipios = cargar_municipios(mtime_mun)
 grupos, rubros, centrales, deptos, fecha_min_g, fecha_max_g = consultar_catalogos(mtime_ab, mtime_pr)
@@ -632,21 +633,27 @@ with f6:
 st.markdown("</div>", unsafe_allow_html=True)
 
 # ── Sección SARA ──────────────────────────────────────────
-with st.container():
-    st.markdown("""
-    <div style="background:#1A2133;border:1px solid #3D4F6A;border-radius:10px;
-        padding:0.6rem 0.9rem 0.5rem 0.9rem;margin-bottom:0.85rem;">
-        <div style="font-size:0.78rem;color:#7A9CC0;font-weight:600;
-            letter-spacing:0.06em;margin-bottom:0.5rem;">
-            FILTROS DEL PROYECTO SARA
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+# ── Sección SARA ──────────────────────────────────────────
+st.markdown("""
+<style>
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="stVerticalBlock"] input[aria-label="Rubros priorizados SARA"]) {
+    background: #1A2133;
+    border: 1px solid #3D4F6A;
+    border-radius: 10px;
+    padding: 0.6rem 0.9rem 0.5rem 0.9rem;
+    margin-bottom: 0.85rem;
+}
+</style>
+""", unsafe_allow_html=True)
 
+with st.container(border=False):
+    st.markdown('<div style="font-size:0.78rem;color:#7A9CC0;font-weight:600;'
+                'letter-spacing:0.06em;margin-bottom:0.3rem;">FILTROS DEL PROYECTO SARA</div>',
+                unsafe_allow_html=True)
     fs0, fs1, fs2, fs3 = st.columns([1.2, 1, 1.5, 2.3])
     with fs0:
         solo_priorizados = st.checkbox(
-            "Solo rubros priorizados SARA",
+            "Rubros priorizados SARA",
             value=False,
             help="Filtra el selector de Rubro para mostrar únicamente los 37 rubros priorizados en el marco analítico del proyecto SARA"
         )
@@ -730,10 +737,38 @@ serie_pr_df, precios_central_df = consultar_precios(
 
 # ── Datos internacionales ─────────────────────────────────
 @st.cache_data(show_spinner=False)
+@st.cache_resource(show_spinner=False)
+def get_con_intl(mtime):
+    con = duckdb.connect(database=":memory:")
+    con.execute("PRAGMA threads=4")
+    con.execute(f"""
+        CREATE OR REPLACE VIEW internacionales AS
+        SELECT
+            CAST(fecha_mes AS DATE)                         AS fecha_mes,
+            MONTH(CAST(fecha_mes AS DATE))                  AS mes,
+            CASE WHEN MONTH(CAST(fecha_mes AS DATE)) BETWEEN 1 AND 6
+                 THEN 'Primer semestre' ELSE 'Segundo semestre' END AS semestre,
+            STRFTIME(CAST(fecha_mes AS DATE),'%Y-%m')       AS etiqueta_mes,
+            TRIM(CAST(grupo AS VARCHAR))                    AS grupo,
+            TRIM(CAST(rubro AS VARCHAR))                    AS rubro,
+            TRIM(CAST(central_mayorista AS VARCHAR))        AS central_mayorista,
+            UPPER(TRIM(CAST(pais_origen AS VARCHAR)))       AS pais_origen,
+            CAST(lon_orig AS DOUBLE)                        AS lon_orig,
+            CAST(lat_orig AS DOUBLE)                        AS lat_orig,
+            CAST(lon_dest AS DOUBLE)                        AS lon_dest,
+            CAST(lat_dest AS DOUBLE)                        AS lat_dest,
+            CAST(toneladas AS DOUBLE)                       AS toneladas
+        FROM read_parquet('{RUTA_INTL_SQL}')
+    """)
+    return con
+
+@st.cache_data(show_spinner=False)
 def consultar_internacionales(fecha_ini, fecha_fin, semestre, grupo, rubros,
-                               centrales_t, mtime):
-    con = get_con_abast(mtime)
-    c = ["fecha_mes BETWEEN ? AND ?","fecha_mes <= '2026-03-01'"]
+                               centrales_t, mtime_intl):
+    if not RUTA_INTERNACIONALES.exists():
+        return pd.DataFrame()
+    con = get_con_intl(mtime_intl)
+    c = ["fecha_mes BETWEEN ? AND ?"]
     p = [fecha_ini.isoformat(), fecha_fin.isoformat()]
     if semestre == "Primer semestre":    c.append("mes BETWEEN 1 AND 6")
     elif semestre == "Segundo semestre": c.append("mes BETWEEN 7 AND 12")
@@ -743,15 +778,14 @@ def consultar_internacionales(fecha_ini, fecha_fin, semestre, grupo, rubros,
         c.append("grupo = ?"); p.append(grupo)
     if centrales_t:
         c.append(f"central_mayorista IN ({','.join(['?']*len(centrales_t))})"); p.extend(list(centrales_t))
-    # Solo registros sin código DIVIPOLA válido (internacionales)
-    c.append("(LENGTH(TRIM(cod_municipio)) != 5 OR TRY_CAST(cod_municipio AS INTEGER) IS NULL)")
     w = " AND ".join(c)
     try:
         df = con.execute(f"""
-            SELECT municipio_origen AS pais_origen, central_mayorista,
-                   AVG(lon_central) AS lon_dest, AVG(lat_central) AS lat_dest,
+            SELECT pais_origen, central_mayorista,
+                   AVG(lon_orig) AS lon_orig, AVG(lat_orig) AS lat_orig,
+                   AVG(lon_dest) AS lon_dest, AVG(lat_dest) AS lat_dest,
                    SUM(toneladas) AS toneladas_total
-            FROM lineas WHERE {w}
+            FROM internacionales WHERE {w}
             GROUP BY 1,2 ORDER BY toneladas_total DESC
         """, p).df()
     except Exception:
@@ -759,7 +793,7 @@ def consultar_internacionales(fecha_ini, fecha_fin, semestre, grupo, rubros,
     return df
 
 intl_raw = consultar_internacionales(
-    fecha_ini, fecha_fin, semestre_sel, grupo_sel, rubros_t, centrales_t, mtime_ab
+    fecha_ini, fecha_fin, semestre_sel, grupo_sel, rubros_t, centrales_t, mtime_intl
 )
 if not intl_raw.empty:
     intl_raw["lon_orig"] = intl_raw["pais_origen"].str.upper().map(
