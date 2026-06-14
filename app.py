@@ -77,7 +77,7 @@ RUBROS_PRIORIZADOS_SARA = {
     "Aguacate","Ahuyama","Arracacha","Arroz","Arveja","Banano",
     "Calabacin_calabaza","Cebolla_cabezona","Cebolla_larga","Frijol",
     "Guayaba","Habichuela","Lechuga","Limon","Lulo","Mandarina","Mango",
-    "Maracuya","Mora","Naranja","Papa","Papaya","Pina","Platano","Tomate",
+    "Maracuya","Mora","Name","Naranja","Papa","Papaya","Pina","Platano","Tomate",
     "Tomate_de_arbol","Yuca","Zanahoria","Carne_cerdo","Carne_pollo",
     "Carne_res","Pescado","Huevos","Leche","Quesos_cuajadas","Panela"
 }
@@ -436,7 +436,7 @@ def consultar_paises(mtime_intl):
     con = get_con_intl(mtime_intl)
     df = con.execute("""
         SELECT DISTINCT pais_origen FROM internacionales
-        WHERE pais_origen NOT IN ('COLOMBIA','COLOMBIA ')
+        WHERE UPPER(TRIM(pais_origen)) != 'COLOMBIA'
         ORDER BY pais_origen
     """).df()
     return df["pais_origen"].tolist()
@@ -794,7 +794,9 @@ territorio_sel = [t for t, v in territorio_checks.items() if v]
 if solo_priorizados and not rubros_sel:
     rubros_sel = list(RUBROS_PRIORIZADOS_SARA)
 
-# Resolver municipios priorizados
+# Resolver municipios priorizados — SOLO oferta/demanda/metropolitana
+# El territorio funcional se aplica SEPARADO (en muns_prio_t para la consulta
+# y en muns_resalte para el mapa), no mezclado con oferta/demanda
 if prio_oferta and prio_demanda:
     muns_prio = MUNS_AMBOS
 elif prio_oferta:
@@ -804,16 +806,24 @@ elif prio_demanda:
 else:
     muns_prio = None
 
-# Región Metropolitana: intersecta con lo que ya hay (o restringe si no hay otro filtro)
 if prio_region_metropolitana:
     muns_prio = (muns_prio & MUNS_REGION_METROPOLITANA) if muns_prio else set(MUNS_REGION_METROPOLITANA)
 
-# Territorio funcional: intersecta con lo que ya hay
+# Territorio funcional — conjunto separado para consulta y mapa
+muns_territorio_consulta = set()
 if territorio_sel:
-    muns_territorio = set()
     for t in territorio_sel:
-        muns_territorio.update(TERRITORIOS_FUNC.get(t, []))
-    muns_prio = (muns_prio & muns_territorio) if muns_prio else muns_territorio
+        muns_territorio_consulta.update(TERRITORIOS_FUNC.get(t, []))
+
+# muns_prio_t para la consulta SQL: intersección de oferta/demanda/metro CON territorio si aplica
+if muns_territorio_consulta and muns_prio:
+    muns_prio_consulta = muns_prio & muns_territorio_consulta
+elif muns_territorio_consulta:
+    muns_prio_consulta = muns_territorio_consulta
+elif muns_prio:
+    muns_prio_consulta = muns_prio
+else:
+    muns_prio_consulta = None
 
 if isinstance(rango, tuple) and len(rango) == 2:
     fecha_ini, fecha_fin = rango
@@ -822,17 +832,13 @@ else:
 
 centrales_t   = tuple(centrales_sel)
 deptos_t      = tuple([d for d in deptos_sel if d != "INTERNACIONAL"])
-# Región Central restringe a esos deptos si no hay otro filtro de depto
+# Región Central restringe deptos cuando no hay otro depto seleccionado
 if prio_region_central and not deptos_t:
     deptos_t = tuple(DEPTOS_REGION_CENTRAL)
-elif prio_region_central and deptos_t:
-    # Si ya hay deptos seleccionados, la intersección es naturalmente los deptos que están en RC
-    # (no ampliamos, solo dejamos los que ya están — que deben ser de RC por el selector restringido)
-    pass
 rubros_t      = tuple(rubros_sel)
 municipios_t  = tuple(municipios_sel) if municipios_sel else ()
 paises_t      = tuple(paises_sel) if paises_sel else ()
-muns_prio_t   = tuple(sorted(muns_prio)) if muns_prio else ()
+muns_prio_t   = tuple(sorted(muns_prio_consulta)) if muns_prio_consulta else ()
 
 # ── Lógica de internacionales ─────────────────────────────
 # incluir_intl: mostrar datos internacionales
@@ -841,19 +847,17 @@ incluir_intl = (
     or bool(paises_sel)
     or not deptos_sel
 )
-# solo_internacional: SOLO mostrar internacionales
+# solo_internacional: SOLO mostrar internacionales (sin datos nacionales)
+# Ocurre cuando el único filtro de origen es INTERNACIONAL o países
 solo_internacional = (
-    (bool(paises_sel) or "INTERNACIONAL" in deptos_sel)
-    and not deptos_t
+    bool(paises_sel) and not deptos_t and not municipios_t
+) or (
+    bool(deptos_sel)
+    and all(d == "INTERNACIONAL" for d in deptos_sel)
     and not municipios_t
-    and not muns_prio_t  # no hay filtro de municipios nacionales tampoco
 )
-# excluir internacionales si hay filtro nacional explícito sin INTERNACIONAL
-excluir_intl_por_depto = (
-    (bool(deptos_t) or bool(municipios_t))
-    and "INTERNACIONAL" not in deptos_sel
-    and not paises_sel
-)
+# excluir_nacional: hay filtro de depto/municipio nacional pero no INTERNACIONAL
+excluir_intl_por_depto = bool(deptos_t) and "INTERNACIONAL" not in deptos_sel and not paises_sel
 
 rubro_unico       = rubros_sel[0] if len(rubros_sel) == 1 else None
 tiene_rubro_unico = len(rubros_sel) == 1
@@ -1110,33 +1114,6 @@ else:
     sk_top    = pd.DataFrame(columns=["municipio_origen","central_mayorista","toneladas_total"])
     pct_cobertura = 0
 
-# Cuando solo_internacional, construir rk y sk_top desde internacionales
-if solo_internacional and not intl_df.empty:
-    intl_sk2 = intl_df.groupby(["pais_origen","central_mayorista"], as_index=False).agg(
-        toneladas_total=("toneladas_total","sum")
-    ).rename(columns={"pais_origen":"municipio_origen"})
-    intl_sk2["municipio_origen"] = "* " + intl_sk2["municipio_origen"]
-    top_paises2 = intl_df.groupby("pais_origen")["toneladas_total"].sum().nlargest(10).index.tolist()
-    sk_top = intl_sk2[intl_sk2["municipio_origen"].isin(["* " + p for p in top_paises2])].copy()
-
-    intl_rk2 = intl_df.groupby("pais_origen", as_index=False).agg(
-        toneladas_total=("toneladas_total","sum"),
-        meses_participacion=("toneladas_total","count"),
-    )
-    intl_rk2["municipio_origen"]    = "* " + intl_rk2["pais_origen"]
-    intl_rk2["departamento_origen"] = "Internacional"
-    intl_rk2["cod_municipio"]       = "intl"
-    intl_rk2["precio_municipio"]    = np.nan
-    intl_rk2["ventaja_precio"]      = np.nan
-    intl_rk2["part_filtro"] = (intl_rk2["toneladas_total"] / vol_filtro_total * 100
-                                if vol_filtro_total > 0 else 0.0)
-    intl_rk2["part_total"]  = 0.0
-    intl_rk2["part_rape"]   = 0.0
-    intl_rk2["indice"]      = np.nan
-    rk = intl_rk2.sort_values("toneladas_total", ascending=False).reset_index(drop=True)
-    rk["ranking"] = rk.index + 1
-    top30 = set()
-
 # =========================================================
 # MAPA — polígonos con colores por estado
 # deptos_sel resalta municipios del departamento en amarillo
@@ -1145,20 +1122,27 @@ if solo_internacional and not intl_df.empty:
 
 deptos_sel_upper = {d.upper() for d in deptos_sel if d != "INTERNACIONAL"}
 
-# Municipios a resaltar en el mapa:
-# - Si hay territorio seleccionado: mostrar solo esos municipios (sin cruzar con oferta/demanda
-#   para que el polígono sea coherente con el territorio)
-# - Si hay solo oferta/demanda sin territorio: mostrar esos municipios
-muns_territorio_set = set()
-for t in territorio_sel:
-    muns_territorio_set.update(TERRITORIOS_FUNC.get(t, []))
-
-if muns_territorio_set:
-    muns_resalte = muns_territorio_set  # mostrar el territorio completo en el mapa
+# Municipios a resaltar en el mapa (separado de la lógica de consulta):
+# Prioridad: territorio > región metropolitana > oferta/demanda
+# El territorio muestra sus polígonos completos (sin intersección)
+if muns_territorio_consulta:
+    muns_resalte = muns_territorio_consulta
+elif prio_region_metropolitana:
+    muns_resalte = MUNS_REGION_METROPOLITANA
 elif muns_prio:
     muns_resalte = muns_prio
 else:
     muns_resalte = set()
+
+# Región Central: resaltar todos los municipios de los deptos RAPE
+muns_region_central_set = set()
+if prio_region_central:
+    if "cod_municipio" in municipios_df.columns:
+        muns_region_central_set = set(
+            municipios_df[
+                municipios_df["departamento_origen"].str.upper().isin(DEPTOS_REGION_CENTRAL)
+            ]["cod_municipio"].astype(str).tolist()
+        )
 
 top30_map = set() if solo_internacional else top30
 
@@ -1167,7 +1151,9 @@ def color_fill(codigo, depto):
     if cod in top30_map:
         return [110, 68, 255, 160]
     if muns_resalte and cod in muns_resalte:
-        return [180, 190, 210, 70]
+        return [180, 190, 210, 90]
+    if muns_region_central_set and cod in muns_region_central_set:
+        return [170, 185, 200, 55]
     if deptos_sel_upper and str(depto).upper() in deptos_sel_upper:
         return [180, 190, 205, 60]
     return [40, 48, 62, 18]
@@ -1178,6 +1164,8 @@ def color_line(codigo, depto):
         return [170, 130, 255, 240]
     if muns_resalte and cod in muns_resalte:
         return [210, 220, 240, 230]
+    if muns_region_central_set and cod in muns_region_central_set:
+        return [200, 215, 230, 180]
     if deptos_sel_upper and str(depto).upper() in deptos_sel_upper:
         return [200, 210, 225, 180]
     return [100, 110, 125, 60]
@@ -1253,6 +1241,14 @@ def render_principal(vol_filtro_total, mun_act, cent_act, precio_prom_general,
             </div>""", unsafe_allow_html=True)
 
         vol_intl = intl_df["toneladas_total"].sum() if not intl_df.empty else 0
+        # Centrales activas: si solo internacional, contar centrales de destino intl
+        cent_act_display = cent_act
+        if cent_act == 0 and not intl_df.empty:
+            cent_act_display = intl_df["central_mayorista"].nunique()
+        # Municipios origen: si solo internacional, contar países de origen
+        mun_act_display = mun_act
+        if mun_act == 0 and not intl_df.empty:
+            mun_act_display = intl_df["pais_origen"].nunique()
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-label">Toneladas abastecidas</div>
@@ -1261,12 +1257,12 @@ def render_principal(vol_filtro_total, mun_act, cent_act, precio_prom_general,
         </div>
         <div class="metric-card">
             <div class="metric-label">Municipios origen activos</div>
-            <div class="metric-value">{mun_act:,}</div>
+            <div class="metric-value">{mun_act_display:,}</div>
             <div class="metric-small">Con flujo válido</div>
         </div>
         <div class="metric-card">
             <div class="metric-label">Centrales activas</div>
-            <div class="metric-value">{cent_act}</div>
+            <div class="metric-value">{cent_act_display}</div>
             <div class="metric-small">Bajo filtros actuales</div>
         </div>
         """, unsafe_allow_html=True)
@@ -1364,26 +1360,28 @@ def render_principal(vol_filtro_total, mun_act, cent_act, precio_prom_general,
                 get_fill_color=[0,200,120,200], get_line_color=[0,255,150,255],
                 line_width_min_pixels=2, pickable=True, auto_highlight=True
             ))
-            # Centrales destino de internacionales
+
+        # Centrales mayoristas — siempre visibles si hay datos (nacionales o internacionales)
+        if not cent_pts.empty:
+            layers.append(pdk.Layer(
+                "ScatterplotLayer", data=cent_pts,
+                get_position="[lon, lat]", get_radius=13500,
+                get_fill_color=[0,210,255,190], get_line_color=[170,245,255,255],
+                line_width_min_pixels=2, pickable=True
+            ))
+        elif not intl_df.empty:
+            # Cuando solo hay internacionales, mostrar centrales de destino
             cent_intl = intl_df.groupby("central_mayorista", as_index=False).agg(
                 lon=("lon_dest","first"), lat=("lat_dest","first"),
                 toneladas_total=("toneladas_total","sum")
             ).dropna(subset=["lon","lat"])
-            cent_intl["tipo_elemento"] = "Central mayorista (destino intl.)"
+            cent_intl["tipo_elemento"] = "Central mayorista"
             cent_intl["detalle_1"] = "Central: "   + cent_intl["central_mayorista"].fillna("")
             cent_intl["detalle_2"] = "Toneladas: " + cent_intl["toneladas_total"].map(formatear_ton)
             cent_intl["detalle_3"] = ""
             cent_intl["detalle_4"] = ""
             layers.append(pdk.Layer(
                 "ScatterplotLayer", data=cent_intl,
-                get_position="[lon, lat]", get_radius=13500,
-                get_fill_color=[0,210,255,190], get_line_color=[170,245,255,255],
-                line_width_min_pixels=2, pickable=True, auto_highlight=True
-            ))
-
-        if not cent_pts.empty:
-            layers.append(pdk.Layer(
-                "ScatterplotLayer", data=cent_pts,
                 get_position="[lon, lat]", get_radius=13500,
                 get_fill_color=[0,210,255,190], get_line_color=[170,245,255,255],
                 line_width_min_pixels=2, pickable=True
