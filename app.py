@@ -756,12 +756,6 @@ with st.expander("**FILTROS DEL PROYECTO SARA**", expanded=False):
             territorio_checks[t] = st.checkbox(t, value=False, key=f"terr_{t}")
 territorio_sel = [t for t, v in territorio_checks.items() if v]
 
-# ── Botón limpiar todos los filtros ──────────────────────
-if st.button("🗑 Limpiar todos los filtros", key="btn_limpiar"):
-    for key in list(st.session_state.keys()):
-        del st.session_state[key]
-    st.rerun()
-
 # Aplicar filtro de priorizados al selector de rubros
 if solo_priorizados and not rubros_sel:
     rubros_sel = list(RUBROS_PRIORIZADOS_SARA)
@@ -859,10 +853,13 @@ def consultar_internacionales(fecha_ini, fecha_fin, semestre, grupo, rubros,
         df = pd.DataFrame()
     return df
 
-intl_raw = consultar_internacionales(
-    fecha_ini, fecha_fin, semestre_sel, grupo_sel, rubros_t,
-    centrales_t, paises_t, mtime_intl
-)
+if incluir_intl:
+    intl_raw = consultar_internacionales(
+        fecha_ini, fecha_fin, semestre_sel, grupo_sel, rubros_t,
+        centrales_t, paises_t, mtime_intl
+    )
+else:
+    intl_raw = pd.DataFrame()
 if not intl_raw.empty:
     intl_raw["lon_orig"] = intl_raw["pais_origen"].str.upper().map(
         {k: v[0] for k, v in PAISES_COORDS.items()})
@@ -902,6 +899,10 @@ vol_rape   = _sf(rape_df, "vol_rape")
 # Toneladas internacionales — se suman si hay datos intl activos
 vol_intl         = intl_df["toneladas_total"].sum() if not intl_df.empty else 0.0
 vol_filtro_total = vol_filtro + vol_intl
+
+# Si solo se seleccionó INTERNACIONAL en deptos, ocultar flujos nacionales del mapa
+if deptos_sel and all(d == "INTERNACIONAL" for d in deptos_sel):
+    flujos_df = pd.DataFrame()
 
 # Precio promedio general — solo válido con un único rubro seleccionado
 precio_prom_general = (
@@ -1045,16 +1046,25 @@ else:
 
 deptos_sel_upper = {d.upper() for d in deptos_sel if d != "INTERNACIONAL"}
 
-# Municipios del territorio funcional seleccionado — para resaltar en mapa
+# Municipios a resaltar = intersección de territorio + oferta/demanda
 muns_territorio_set = set()
 for t in territorio_sel:
     muns_territorio_set.update(TERRITORIOS_FUNC.get(t, []))
+
+if muns_territorio_set and muns_prio:
+    muns_resalte = muns_territorio_set & muns_prio
+elif muns_territorio_set:
+    muns_resalte = muns_territorio_set
+elif muns_prio:
+    muns_resalte = muns_prio
+else:
+    muns_resalte = set()
 
 def color_fill(codigo, depto):
     cod = str(codigo)
     if cod in top30:
         return [110, 68, 255, 160]
-    if muns_territorio_set and cod in muns_territorio_set:
+    if muns_resalte and cod in muns_resalte:
         return [180, 190, 210, 70]
     if deptos_sel_upper and str(depto).upper() in deptos_sel_upper:
         return [180, 190, 205, 60]
@@ -1064,7 +1074,7 @@ def color_line(codigo, depto):
     cod = str(codigo)
     if cod in top30:
         return [170, 130, 255, 240]
-    if muns_territorio_set and cod in muns_territorio_set:
+    if muns_resalte and cod in muns_resalte:
         return [210, 220, 240, 230]
     if deptos_sel_upper and str(depto).upper() in deptos_sel_upper:
         return [200, 210, 225, 180]
@@ -1167,8 +1177,14 @@ def render_principal(vol_filtro_total, mun_act, cent_act, precio_prom_general,
         if mostrar_flujos_intl and not intl_df.empty:
             leyenda_intl = '<div class="legend-item"><span class="legend-box" style="background:#00C878;"></span>Flujos internacionales</div>'
         leyenda_territorio = ""
-        if territorio_sel:
-            leyenda_territorio = '<div class="legend-item"><span class="legend-box" style="background:#B4BED2;border:2px solid #D2DCF0;"></span>Municipios territorio SARA</div>'
+        if muns_resalte:
+            if territorio_sel and muns_prio:
+                label_t = "Municipios SARA (intersección)"
+            elif territorio_sel:
+                label_t = "Municipios territorio SARA"
+            else:
+                label_t = "Municipios priorizados SARA"
+            leyenda_territorio = f'<div class="legend-item"><span class="legend-box" style="background:#B4BED2;border:2px solid #D2DCF0;"></span>{label_t}</div>'
         st.markdown(f"""
         <div class="legend-item"><span class="legend-box" style="background:#6E44FF;"></span>Top 30 abastecedores</div>
         {leyenda_depto}
