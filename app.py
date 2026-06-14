@@ -704,19 +704,49 @@ with g4:
 
 st.markdown("</div>", unsafe_allow_html=True)
 
-# ── Sección SARA (panel izquierdo — se renderiza dentro del layout) ──
-# Los filtros SARA se definen aquí pero se renderizan en col_izq
-solo_priorizados = False  # se sobreescribe en el layout
-prio_oferta      = False
-prio_demanda     = False
-territorio_sel   = []
+# ── Sección SARA — fuera del fragment, interactiva ────────
+with st.expander("**FILTROS DEL PROYECTO SARA**", expanded=False):
+    sc1, sc2, sc3 = st.columns([1.2, 1.5, 2.3])
+    with sc1:
+        solo_priorizados = st.checkbox(
+            "Rubros priorizados SARA", value=False,
+            help="Filtra el selector de Rubro a los 37 rubros priorizados SARA"
+        )
+        st.markdown('<div style="font-size:0.8rem;color:#9EABC0;margin-top:0.6rem;">Municipios priorizados</div>', unsafe_allow_html=True)
+        prio_oferta  = st.checkbox("Oferta",  value=False, key="prio_oferta")
+        prio_demanda = st.checkbox("Demanda", value=False, key="prio_demanda")
+    with sc2:
+        territorios_opciones = sorted(TERRITORIOS_FUNC.keys())
+        territorio_sel = st.multiselect(
+            "Territorio funcional",
+            options=territorios_opciones,
+            default=[],
+            placeholder="Todos los territorios"
+        )
+    with sc3:
+        st.markdown('<div style="font-size:0.82rem;color:#9EABC0;padding-top:1.6rem;">🔀 Máx. flujos en mapa</div>', unsafe_allow_html=True)
+        max_flujos = st.slider("Máx. flujos", min_value=100, max_value=2000,
+                               value=MAX_LINEAS_MAPA, step=100, label_visibility="collapsed")
 
 # Aplicar filtro de priorizados al selector de rubros
 if solo_priorizados and not rubros_sel:
     rubros_sel = list(RUBROS_PRIORIZADOS_SARA)
 
-# ── Resolver filtro de municipios priorizados ─────────────
-muns_prio = None  # se sobreescribe tras widgets SARA
+# Resolver municipios priorizados
+if prio_oferta and prio_demanda:
+    muns_prio = MUNS_AMBOS
+elif prio_oferta:
+    muns_prio = MUNS_OFERTA
+elif prio_demanda:
+    muns_prio = MUNS_DEMANDA
+else:
+    muns_prio = None
+
+if territorio_sel:
+    muns_territorio = set()
+    for t in territorio_sel:
+        muns_territorio.update(TERRITORIOS_FUNC.get(t, []))
+    muns_prio = (muns_prio & muns_territorio) if muns_prio else muns_territorio
 
 if isinstance(rango, tuple) and len(rango) == 2:
     fecha_ini, fecha_fin = rango
@@ -924,10 +954,9 @@ if not rank_df.empty:
         intl_sk = intl_df.groupby(["pais_origen","central_mayorista"], as_index=False).agg(
             toneladas_total=("toneladas_total","sum")
         ).rename(columns={"pais_origen":"municipio_origen"})
-        intl_sk["municipio_origen"] = "🌐 " + intl_sk["municipio_origen"]
-        # Tomar top 2 países por volumen para no saturar el sankey
+        intl_sk["municipio_origen"] = "* " + intl_sk["municipio_origen"]
         top_paises = intl_df.groupby("pais_origen")["toneladas_total"].sum().nlargest(2).index.tolist()
-        intl_sk = intl_sk[intl_sk["municipio_origen"].isin(["🌐 " + p for p in top_paises])]
+        intl_sk = intl_sk[intl_sk["municipio_origen"].isin(["* " + p for p in top_paises])]
         sk_top = pd.concat([sk_top, intl_sk], ignore_index=True)
 else:
     rk        = pd.DataFrame()
@@ -1013,12 +1042,10 @@ def render_principal(vol_filtro, mun_act, cent_act, precio_prom_general,
                      deptos_sel, tiene_rubro_unico, max_flujos, pct_cobertura,
                      solo_priorizados, prio_oferta, prio_demanda, territorio_sel):
 
-    # ── 3 columnas: SARA/leyenda | Mapa+Serie | Indicadores+Sankey ──
     col_izq, col_centro, col_der = st.columns([1.0, 3.6, 1.5], gap="small")
 
     # ── COLUMNA IZQUIERDA: Filtros SARA + Leyenda ─────────
     with col_izq:
-        # Panel SARA
         st.markdown("""
         <div style="background:#1A2133;border:1px solid #3D4F6A;border-radius:10px;
             padding:0.7rem 0.8rem 0.6rem 0.8rem;margin-bottom:0.6rem;">
@@ -1026,24 +1053,16 @@ def render_principal(vol_filtro, mun_act, cent_act, precio_prom_general,
             letter-spacing:0.06em;margin-bottom:0.5rem;">FILTROS SARA</div>
         """, unsafe_allow_html=True)
 
-        solo_priorizados = st.checkbox(
-            "Rubros priorizados",
-            value=solo_priorizados,
-            key="cb_prio_rubros",
-            help="Filtra el selector de Rubro a los 37 rubros priorizados SARA"
-        )
+        st.checkbox("Rubros priorizados", value=solo_priorizados,
+                    key="cb_prio_rubros", disabled=True,
+                    help="Activa este filtro en la barra superior")
         st.markdown('<div style="font-size:0.8rem;color:#9EABC0;margin-top:0.5rem;margin-bottom:0.2rem;">Municipios priorizados</div>', unsafe_allow_html=True)
-        prio_oferta  = st.checkbox("Oferta",  value=prio_oferta,  key="cb_oferta")
-        prio_demanda = st.checkbox("Demanda", value=prio_demanda, key="cb_demanda")
+        st.checkbox("Oferta",  value=prio_oferta,  key="cb_oferta_d",  disabled=True)
+        st.checkbox("Demanda", value=prio_demanda, key="cb_demanda_d", disabled=True)
 
-        territorios_opciones = sorted(TERRITORIOS_FUNC.keys())
-        territorio_sel = st.multiselect(
-            "Territorio funcional",
-            options=territorios_opciones,
-            default=territorio_sel,
-            placeholder="Todos",
-            key="ms_territorio"
-        )
+        if territorio_sel:
+            st.markdown(f'<div style="font-size:0.8rem;color:#9EABC0;margin-top:0.4rem;">Territorio: {", ".join(territorio_sel)}</div>', unsafe_allow_html=True)
+
         st.markdown('</div>', unsafe_allow_html=True)
 
         # Leyenda
@@ -1060,14 +1079,10 @@ def render_principal(vol_filtro, mun_act, cent_act, precio_prom_general,
         <div class="legend-item"><span class="legend-box" style="background:#00C878;"></span>Flujos internacionales</div>
         <div class="legend-item"><span class="legend-box" style="background:#00D2FF;"></span>Central mayorista</div>
         <div class="small-note" style="margin-top:0.5rem;">
-            <b>{max_flujos:,}</b> flujos visibles<br>
-            ({pct_cobertura:.0f}% del total)
+            <b>{max_flujos:,}</b> flujos visibles<br>({pct_cobertura:.0f}% del total)
         </div>
         """, unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
-
-        # Retornar valores SARA para aplicar fuera del fragment
-        return solo_priorizados, prio_oferta, prio_demanda, territorio_sel
 
     # ── COLUMNA CENTRO: Mapa + Serie ──────────────────────
     with col_centro:
@@ -1204,7 +1219,7 @@ def render_principal(vol_filtro, mun_act, cent_act, precio_prom_general,
             st.info("Sin datos suficientes.")
 
 
-sara_result = render_principal(
+render_principal(
     vol_filtro=vol_filtro, mun_act=mun_act, cent_act=cent_act,
     precio_prom_general=precio_prom_general,
     geojson_mun=geojson_mun, flujos_df=flujos_df, cent_pts=cent_pts,
