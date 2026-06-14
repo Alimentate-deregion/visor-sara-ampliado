@@ -100,31 +100,25 @@ MUNS_DEMANDA = {
 MUNS_AMBOS = MUNS_OFERTA & MUNS_DEMANDA
 TERRITORIOS_FUNC = {
     "Bogotá, D.C.":     ['11001'],
-    "Norte":            ['25126','25154','25175','25178','25181','25258','25293',
-                         '25307','25312','25317','25320','25326','25372','25438',
-                         '25513','25662','25875'],
-    "Noroccidental":    ['25148','25214','25260','25269','25279','25335','25402',
-                         '25407','25430','25473','25483','25535','25572','25599',
-                         '25612','25754','25769','25779','25785','25793','25797',
-                         '25815','25817','25823','25839','25841','25843','25845',
-                         '25851','25857','25867','25871','25873','25875','25877',
-                         '25885','25899'],
-    "Occidental":       ['25019','25040','25086','25095','25099','25151','25168',
-                         '25183','25200','25245','25258','25281','25290','25297',
-                         '25322','25377','25386','25430','25438','25513','25649',
-                         '25662','25743','25754','25843','25899'],
-    "Oriente - Llanos": ['25151','25178','25281','25524','25599','25649'],
-    "Oriente Guavio":   ['25181','25279','25293','25312','25318','25326','25430',
-                         '25592','25612','25743','25769','25779','25793','25797',
-                         '25823','25839','25841','25851','25857','25867','25871',
-                         '25873','25877','25885'],
-    "Suroccidental":    ['25001','25035','25053','25126','25154','25175','25245',
-                         '25258','25281','25286','25290','25297','25307','25320',
-                         '25322','25377','25386','25430','25438','25473','25513',
-                         '25535','25572','25599','25612','25649','25662','25743',
-                         '25754','25769','25779','25785','25793','25817','25823',
-                         '25839','25843','25845','25851','25857','25867','25873',
-                         '25875','25877','25885','25899'],
+    "Noroccidental":    ['25148','25214','25260','25320','25394','25398','25402',
+                         '25489','25491','25572','25592','25658','25769','25777',
+                         '25799','25851','25862','25875','25885'],
+    "Norte":            ['25126','25154','25175','25183','25200','25224','25258',
+                         '25288','25295','25317','25407','25426','25436','25486',
+                         '25513','25518','25653','25736','25745','25758','25772',
+                         '25779','25781','25785','25793','25807','25817','25823',
+                         '25843','25871','25873','25899'],
+    "Occidental":       ['25019','25040','25086','25095','25099','25123','25168',
+                         '25269','25286','25328','25430','25473','25580','25596',
+                         '25662','25718','25867','25898'],
+    "Oriente - Llanos": ['25151','25178','25281','25335','25339','25438','25530',
+                         '25594','25845'],
+    "Oriente Guavio":   ['25181','25279','25293','25297','25299','25322','25326',
+                         '25372','25377','25839','25841'],
+    "Suroccidental":    ['25001','25035','25053','25120','25245','25290','25307',
+                         '25312','25324','25368','25386','25483','25488','25506',
+                         '25524','25535','25599','25612','25645','25649','25740',
+                         '25743','25754','25797','25805','25815','25878'],
 }
 
 # ── Países de origen internacional ────────────────────────
@@ -690,30 +684,14 @@ st.markdown('<div style="height:0.4rem;"></div>', unsafe_allow_html=True)
 # ── Fila 2: Depto | Municipio | País | Toggle | Slider ───
 g1, g2, g3, g4, g5 = st.columns([1.1, 1.2, 1.2, 0.9, 1.0])
 with g1:
-    # Calcular deptos permitidos si hay filtro SARA activo
-    _muns_prio_temp2 = None
-    if prio_oferta and prio_demanda:   _muns_prio_temp2 = MUNS_AMBOS
-    elif prio_oferta:                  _muns_prio_temp2 = MUNS_OFERTA
-    elif prio_demanda:                 _muns_prio_temp2 = MUNS_DEMANDA
-    if territorio_sel:
-        _muns_terr2 = set()
-        for t in territorio_sel: _muns_terr2.update(TERRITORIOS_FUNC.get(t, []))
-        _muns_prio_temp2 = (_muns_prio_temp2 & _muns_terr2) if _muns_prio_temp2 else _muns_terr2
-    if _muns_prio_temp2 and "cod_municipio" in municipios_df.columns:
-        _deptos_prio = set(
-            municipios_df[municipios_df["cod_municipio"].astype(str).isin(_muns_prio_temp2)]["departamento_origen"].str.upper().tolist()
-        )
-        deptos_opciones = [d for d in deptos if d.upper() in _deptos_prio or d == "INTERNACIONAL"]
-    else:
-        deptos_opciones = deptos
-    deptos_sel = st.multiselect("Depto. origen", deptos_opciones, default=[])
+    deptos_sel = st.multiselect("Depto. origen", deptos, default=[])
 with g2:
     deptos_sin_intl = [d for d in deptos_sel if d != "INTERNACIONAL"]
     if deptos_sin_intl:
         muns_base = municipios_df[municipios_df["departamento_origen"].isin(deptos_sin_intl)]["municipio_origen"].unique().tolist()
     else:
         muns_base = municipios_df["municipio_origen"].unique().tolist()
-    # Filtrar municipios por SARA — misma lógica
+    # Filtrar por priorizados SARA si hay filtro activo (usando vars leídas de session_state)
     _muns_prio_temp = None
     if prio_oferta and prio_demanda:   _muns_prio_temp = MUNS_AMBOS
     elif prio_oferta:                  _muns_prio_temp = MUNS_OFERTA
@@ -722,9 +700,10 @@ with g2:
         _muns_terr = set()
         for t in territorio_sel: _muns_terr.update(TERRITORIOS_FUNC.get(t, []))
         _muns_prio_temp = (_muns_prio_temp & _muns_terr) if _muns_prio_temp else _muns_terr
-    if _muns_prio_temp and "cod_municipio" in municipios_df.columns:
+    if _muns_prio_temp:
         muns_prio_nombres = set(
             municipios_df[municipios_df["cod_municipio"].astype(str).isin(_muns_prio_temp)]["municipio_origen"].tolist()
+            if "cod_municipio" in municipios_df.columns else []
         )
         muns_base = [m for m in muns_base if m in muns_prio_nombres] or muns_base
     muns_opciones = sorted(muns_base)
@@ -803,13 +782,16 @@ municipios_t  = tuple(municipios_sel) if municipios_sel else ()
 paises_t      = tuple(paises_sel) if paises_sel else ()
 muns_prio_t   = tuple(sorted(muns_prio)) if muns_prio else ()
 
-# Solo INTERNACIONAL seleccionado — no ejecutar consultas nacionales
-solo_internacional = bool(deptos_sel) and all(d == "INTERNACIONAL" for d in deptos_sel) and not municipios_sel
-
 incluir_intl = (
     "INTERNACIONAL" in deptos_sel
     or bool(paises_sel)
     or not deptos_sel
+)
+# Solo INTERNACIONAL seleccionado = no ejecutar consultas nacionales
+solo_internacional = (
+    bool(deptos_sel)
+    and all(d == "INTERNACIONAL" for d in deptos_sel)
+    and not municipios_sel
 )
 
 rubro_unico       = rubros_sel[0] if len(rubros_sel) == 1 else None
@@ -828,16 +810,19 @@ else:
 # CONSULTAS
 # =========================================================
 
+_empty_met = pd.DataFrame([{"vol_filtro":0,"mun_activos":0,"cent_activas":0}])
+_empty_tot = pd.DataFrame([{"vol_total":0}])
+_empty_rap = pd.DataFrame([{"vol_rape":0}])
+
 if solo_internacional:
-    # Vaciar todos los resultados nacionales
-    met_df = pd.DataFrame([{"vol_filtro": 0, "mun_activos": 0, "cent_activas": 0}])
-    tot_df = pd.DataFrame([{"vol_total": 0}])
-    rape_df = pd.DataFrame([{"vol_rape": 0}])
-    rank_df = pd.DataFrame()
-    serie_ab_df = pd.DataFrame()
-    flujos_df = pd.DataFrame()
-    sankey_df = pd.DataFrame()
-    serie_pr_df = pd.DataFrame()
+    met_df        = _empty_met
+    tot_df        = _empty_tot
+    rape_df       = _empty_rap
+    rank_df       = pd.DataFrame()
+    serie_ab_df   = pd.DataFrame()
+    flujos_df     = pd.DataFrame()
+    sankey_df     = pd.DataFrame()
+    serie_pr_df   = pd.DataFrame()
     precios_central_df = pd.DataFrame()
 else:
     met_df, tot_df, rape_df, rank_df, serie_ab_df, flujos_df, sankey_df = consultar_abast(
@@ -1085,7 +1070,7 @@ elif muns_prio:
 else:
     muns_resalte = set()
 
-# Si solo INTERNACIONAL, no resaltar nada nacional
+# Cuando solo hay INTERNACIONAL no resaltar nada nacional
 top30_map = set() if solo_internacional else top30
 
 def color_fill(codigo, depto):
