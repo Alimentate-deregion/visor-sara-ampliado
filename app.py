@@ -648,6 +648,14 @@ st.markdown(f"""
 # FILTROS
 # =========================================================
 
+# Leer valores SARA desde session_state ANTES de renderizar filtros
+# Los widgets del expander SARA se definen después pero persisten via session_state
+solo_priorizados = st.session_state.get("_cb_solo_prio", False)
+prio_oferta      = st.session_state.get("prio_oferta",   False)
+prio_demanda     = st.session_state.get("prio_demanda",  False)
+territorio_sel   = [t for t in sorted(TERRITORIOS_FUNC.keys())
+                    if st.session_state.get(f"terr_{t}", False)]
+
 st.markdown('<div class="filter-wrap">', unsafe_allow_html=True)
 
 # ── Fila 1: Grupo | Rubro | Central | Periodo | Fechas ───
@@ -655,10 +663,7 @@ f1, f2, f3, f4, f5 = st.columns([1.1, 1.5, 1.5, 1.0, 1.4])
 with f1:
     grupo_sel = st.selectbox("Grupo", ["Todos"] + grupos, index=0)
 with f2:
-    # Valores por defecto de filtros SARA — se sobreescriben si el expander ya fue renderizado
-    # Usamos session_state para leer el valor actual antes de renderizar el expander
-    _solo_prio = st.session_state.get("_cb_solo_prio", False)
-    if _solo_prio:
+    if solo_priorizados:
         rubros_f_codigos = sorted(RUBROS_PRIORIZADOS_SARA, key=lambda r: label_rubro(r))
     elif grupo_sel != "Todos":
         con_tmp = get_con_abast(mtime_ab)
@@ -692,21 +697,19 @@ with g2:
         muns_base = municipios_df[municipios_df["departamento_origen"].isin(deptos_sin_intl)]["municipio_origen"].unique().tolist()
     else:
         muns_base = municipios_df["municipio_origen"].unique().tolist()
-    # Filtrar por municipios priorizados SARA si hay filtro activo
-    muns_prio_temp = None
-    if prio_oferta and prio_demanda:   muns_prio_temp = MUNS_AMBOS
-    elif prio_oferta:                  muns_prio_temp = MUNS_OFERTA
-    elif prio_demanda:                 muns_prio_temp = MUNS_DEMANDA
+    # Filtrar por priorizados SARA si hay filtro activo (usando vars leídas de session_state)
+    _muns_prio_temp = None
+    if prio_oferta and prio_demanda:   _muns_prio_temp = MUNS_AMBOS
+    elif prio_oferta:                  _muns_prio_temp = MUNS_OFERTA
+    elif prio_demanda:                 _muns_prio_temp = MUNS_DEMANDA
     if territorio_sel:
-        muns_terr_temp = set()
-        for t in territorio_sel: muns_terr_temp.update(TERRITORIOS_FUNC.get(t, []))
-        muns_prio_temp = (muns_prio_temp & muns_terr_temp) if muns_prio_temp else muns_terr_temp
-    if muns_prio_temp:
-        # Filtrar municipios_df para obtener nombres de los priorizados
+        _muns_terr = set()
+        for t in territorio_sel: _muns_terr.update(TERRITORIOS_FUNC.get(t, []))
+        _muns_prio_temp = (_muns_prio_temp & _muns_terr) if _muns_prio_temp else _muns_terr
+    if _muns_prio_temp:
         muns_prio_nombres = set(
-            municipios_df[municipios_df["cod_municipio"].isin(muns_prio_temp)]["municipio_origen"].tolist()
-            if "cod_municipio" in municipios_df.columns
-            else []
+            municipios_df[municipios_df["cod_municipio"].astype(str).isin(_muns_prio_temp)]["municipio_origen"].tolist()
+            if "cod_municipio" in municipios_df.columns else []
         )
         muns_base = [m for m in muns_base if m in muns_prio_nombres] or muns_base
     muns_opciones = sorted(muns_base)
