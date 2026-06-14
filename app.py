@@ -809,9 +809,6 @@ if territorio_sel:
         muns_territorio.update(TERRITORIOS_FUNC.get(t, []))
     muns_prio = (muns_prio & muns_territorio) if muns_prio else muns_territorio
 
-# Región central filtra deptos en la consulta, no municipios
-deptos_region_central_t = tuple(DEPTOS_REGION_CENTRAL) if prio_region_central else ()
-
 if isinstance(rango, tuple) and len(rango) == 2:
     fecha_ini, fecha_fin = rango
 else:
@@ -819,6 +816,9 @@ else:
 
 centrales_t   = tuple(centrales_sel)
 deptos_t      = tuple([d for d in deptos_sel if d != "INTERNACIONAL"])
+# Región Central amplía el filtro de deptos si no hay depto explícito
+if prio_region_central and not deptos_t:
+    deptos_t = tuple(DEPTOS_REGION_CENTRAL)
 rubros_t      = tuple(rubros_sel)
 municipios_t  = tuple(municipios_sel) if municipios_sel else ()
 paises_t      = tuple(paises_sel) if paises_sel else ()
@@ -1097,6 +1097,37 @@ else:
     flujos_df = pd.DataFrame()
     sk_top    = pd.DataFrame(columns=["municipio_origen","central_mayorista","toneladas_total"])
     pct_cobertura = 0
+
+# Agregar internacionales al sankey y tabla cuando solo_internacional
+# (el bloque anterior no corre porque rank_df está vacío)
+if solo_internacional and not intl_df.empty:
+    intl_sk2 = intl_df.groupby(["pais_origen","central_mayorista"], as_index=False).agg(
+        toneladas_total=("toneladas_total","sum")
+    ).rename(columns={"pais_origen":"municipio_origen"})
+    intl_sk2["municipio_origen"] = "* " + intl_sk2["municipio_origen"]
+    top_paises2 = intl_df.groupby("pais_origen")["toneladas_total"].sum().nlargest(10).index.tolist()
+    sk_top = intl_sk2[intl_sk2["municipio_origen"].isin(["* " + p for p in top_paises2])].copy()
+
+    intl_rk2 = intl_df.groupby("pais_origen", as_index=False).agg(
+        toneladas_total=("toneladas_total","sum"),
+        meses_participacion=("toneladas_total","count"),
+    )
+    intl_rk2["ranking"]            = range(1, len(intl_rk2)+1)
+    intl_rk2["municipio_origen"]   = "* " + intl_rk2["pais_origen"]
+    intl_rk2["departamento_origen"] = "Internacional"
+    intl_rk2["cod_municipio"]      = "intl"
+    intl_rk2["precio_municipio"]   = np.nan
+    intl_rk2["ventaja_precio"]     = np.nan
+    intl_rk2["part_filtro"] = (
+        intl_rk2["toneladas_total"] / vol_filtro_total * 100
+        if vol_filtro_total > 0 else 0.0
+    )
+    intl_rk2["part_total"]  = 0.0
+    intl_rk2["part_rape"]   = 0.0
+    intl_rk2["indice"]      = np.nan
+    rk = intl_rk2.sort_values("toneladas_total", ascending=False).reset_index(drop=True)
+    rk["ranking"] = rk.index + 1
+    top30 = set()
 
 # =========================================================
 # MAPA — polígonos con colores por estado
