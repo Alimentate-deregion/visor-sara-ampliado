@@ -24,11 +24,13 @@ BASE_DIR         = Path("Datos")
 RUTA_LINEAS      = BASE_DIR / "lineas_abastecimiento.parquet"
 RUTA_MUNICIPIOS  = BASE_DIR / "municipios_ligeros.parquet"
 RUTA_PRECIOS     = BASE_DIR / "precios_rubros.parquet"
-RUTA_VARIEDADES  = BASE_DIR / "lineas_variedades.parquet"
-RUTA_LOGO        = BASE_DIR / "MDS-245-ES.jpg"
-RUTA_LINEAS_SQL  = RUTA_LINEAS.as_posix()
-RUTA_PRECIOS_SQL = RUTA_PRECIOS.as_posix()
-RUTA_VAR_SQL     = RUTA_VARIEDADES.as_posix()
+RUTA_VARIEDADES       = BASE_DIR / "lineas_variedades.parquet"
+RUTA_INTERNACIONALES  = BASE_DIR / "lineas_internacionales.parquet"
+RUTA_LOGO             = BASE_DIR / "MDS-245-ES.jpg"
+RUTA_LINEAS_SQL       = RUTA_LINEAS.as_posix()
+RUTA_PRECIOS_SQL      = RUTA_PRECIOS.as_posix()
+RUTA_VAR_SQL          = RUTA_VARIEDADES.as_posix()
+RUTA_INTL_SQL         = RUTA_INTERNACIONALES.as_posix()
 
 DEPTOS_RAPE = {
     "BOGOTÁ", "BOGOTÁ, D.C.", "BOGOTA", "BOGOTA D.C.", "BOGOTÁ D.C.",
@@ -407,9 +409,6 @@ def build_where_ab(fecha_ini, fecha_fin, semestre, grupo, rubros, centrales, dep
     elif semestre == "Segundo semestre": c.append("mes BETWEEN 7 AND 12")
     if rubros:
         c.append(f"rubro IN ({','.join(['?']*len(rubros))})"); p.extend(list(rubros))
-    elif grupo == "⭐ Priorizados SARA":
-        rp = list(RUBROS_PRIORIZADOS_SARA)
-        c.append(f"rubro IN ({','.join(['?']*len(rp))})"); p.extend(rp)
     elif grupo and grupo != "Todos":
         c.append("grupo = ?"); p.append(grupo)
     if centrales:
@@ -606,12 +605,9 @@ st.markdown('<div class="filter-wrap">', unsafe_allow_html=True)
 f1, f2, f3, f4, f5, f6 = st.columns([1.1, 1.3, 1.5, 1.0, 1.0, 1.4])
 
 with f1:
-    grupos_opciones = ["Todos", "⭐ Priorizados SARA"] + grupos
-    grupo_sel = st.selectbox("Grupo", grupos_opciones, index=0)
+    grupo_sel = st.selectbox("Grupo", ["Todos"] + grupos, index=0)
 with f2:
-    if grupo_sel == "⭐ Priorizados SARA":
-        rubros_f_codigos = sorted(RUBROS_PRIORIZADOS_SARA, key=lambda r: label_rubro(r))
-    elif grupo_sel != "Todos":
+    if grupo_sel != "Todos":
         con_tmp = get_con_abast(mtime_ab)
         rubros_f_codigos = con_tmp.execute(
             "SELECT DISTINCT rubro FROM lineas WHERE grupo=? AND rubro IS NOT NULL ORDER BY rubro",
@@ -635,40 +631,50 @@ with f6:
 
 st.markdown("</div>", unsafe_allow_html=True)
 
-# ── Sección SARA (línea separada) ─────────────────────────
-st.markdown("""
-<div style="background:#1E2530;border:1px solid #3D4F6A;border-radius:10px;
-    padding:0.55rem 0.9rem 0.4rem 0.9rem;margin-bottom:0.85rem;">
-    <div style="font-size:0.78rem;color:#7A9CC0;font-weight:600;
-        letter-spacing:0.06em;margin-bottom:0.45rem;">
-        FILTROS DEL PROYECTO SARA
+# ── Sección SARA ──────────────────────────────────────────
+with st.container():
+    st.markdown("""
+    <div style="background:#1A2133;border:1px solid #3D4F6A;border-radius:10px;
+        padding:0.6rem 0.9rem 0.5rem 0.9rem;margin-bottom:0.85rem;">
+        <div style="font-size:0.78rem;color:#7A9CC0;font-weight:600;
+            letter-spacing:0.06em;margin-bottom:0.5rem;">
+            FILTROS DEL PROYECTO SARA
+        </div>
     </div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-fs1, fs2, fs3 = st.columns([1, 1.5, 2.5])
-with fs1:
-    prio_tipo = st.selectbox(
-        "Municipios priorizados",
-        ["Todos","Oferta","Demanda","Oferta y demanda"],
-        index=0
-    )
-with fs2:
-    territorios_opciones = sorted(TERRITORIOS_FUNC.keys())
-    territorio_sel = st.multiselect(
-        "Territorio funcional",
-        options=territorios_opciones,
-        default=[],
-        placeholder="Todos los territorios"
-    )
-with fs3:
-    st.markdown('<div style="font-size:0.82rem;color:#9EABC0;padding-top:1.8rem;">'\
-                '🔀 Máx. flujos en mapa</div>', unsafe_allow_html=True)
-    max_flujos = st.slider(
-        "Máx. flujos", min_value=100, max_value=2000,
-        value=MAX_LINEAS_MAPA, step=100, label_visibility="collapsed"
-    )
+    fs0, fs1, fs2, fs3 = st.columns([1.2, 1, 1.5, 2.3])
+    with fs0:
+        solo_priorizados = st.checkbox(
+            "Solo rubros priorizados SARA",
+            value=False,
+            help="Filtra el selector de Rubro para mostrar únicamente los 37 rubros priorizados en el marco analítico del proyecto SARA"
+        )
+    with fs1:
+        prio_tipo = st.selectbox(
+            "Municipios priorizados",
+            ["Todos","Oferta","Demanda","Oferta y demanda"],
+            index=0
+        )
+    with fs2:
+        territorios_opciones = sorted(TERRITORIOS_FUNC.keys())
+        territorio_sel = st.multiselect(
+            "Territorio funcional",
+            options=territorios_opciones,
+            default=[],
+            placeholder="Todos los territorios"
+        )
+    with fs3:
+        st.markdown('<div style="font-size:0.82rem;color:#9EABC0;padding-top:1.8rem;">'
+                    '🔀 Máx. flujos en mapa</div>', unsafe_allow_html=True)
+        max_flujos = st.slider(
+            "Máx. flujos", min_value=100, max_value=2000,
+            value=MAX_LINEAS_MAPA, step=100, label_visibility="collapsed"
+        )
 
-st.markdown("</div>", unsafe_allow_html=True)
+# Aplicar filtro de priorizados SARA al selector de rubros si está activo
+if solo_priorizados and not rubros_sel:
+    rubros_sel = list(RUBROS_PRIORIZADOS_SARA)
 
 # ── Resolver filtros SARA ─────────────────────────────────
 if prio_tipo == "Oferta":
@@ -703,8 +709,6 @@ if len(rubros_sel) == 1:
     nivel_sel = label_rubro(rubros_sel[0])
 elif len(rubros_sel) > 1:
     nivel_sel = f"{len(rubros_sel)} rubros seleccionados"
-elif grupo_sel == "⭐ Priorizados SARA":
-    nivel_sel = "Rubros priorizados SARA"
 elif grupo_sel != "Todos":
     nivel_sel = grupo_sel
 else:
@@ -735,9 +739,6 @@ def consultar_internacionales(fecha_ini, fecha_fin, semestre, grupo, rubros,
     elif semestre == "Segundo semestre": c.append("mes BETWEEN 7 AND 12")
     if rubros:
         c.append(f"rubro IN ({','.join(['?']*len(rubros))})"); p.extend(list(rubros))
-    elif grupo == "⭐ Priorizados SARA":
-        rp = list(RUBROS_PRIORIZADOS_SARA)
-        c.append(f"rubro IN ({','.join(['?']*len(rp))})"); p.extend(rp)
     elif grupo and grupo != "Todos":
         c.append("grupo = ?"); p.append(grupo)
     if centrales_t:
