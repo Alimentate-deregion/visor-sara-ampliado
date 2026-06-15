@@ -1,5 +1,6 @@
 import base64
 import json
+import unicodedata
 from pathlib import Path
 
 import duckdb
@@ -132,16 +133,58 @@ MUNS_REGION_METROPOLITANA = {'11001','25754','25290'}  # Bogotá, Soacha, Fusaga
 
 # ── Países de origen internacional ────────────────────────
 PAISES_COORDS = {
-    "CHILE":(-71.5430,-35.6751),"ECUADOR":(-78.1834,-1.8312),
-    "ESTADOS UNIDOS DE AMÉRICA":(-95.7129,37.0902),
-    "ESTADOS UNIDOS DE AMERICA":(-95.7129,37.0902),
-    "CANADÁ":(-96.8165,56.1304),"CANADA":(-96.8165,56.1304),
-    "PERÚ":(-75.0152,-9.1900),"PERU":(-75.0152,-9.1900),
-    "CHINA":(104.1954,35.8617),"VIETNAM":(108.2772,14.0583),
-    "ARGENTINA":(-63.6167,-38.4161),"BRASIL":(-51.9253,-14.2350),
-    "VENEZUELA":(-66.5897,6.4238),"COSTA RICA":(-83.7534,9.7489),
-    "MEXICO":(-102.5528,23.6345),"ESPAÑA":(-3.7492,40.4637),
-    "SUDAFRICA":(22.9375,-30.5595),
+    # Originales
+    "CHILE":           (-71.5430, -35.6751),
+    "ECUADOR":         (-78.1834,  -1.8312),
+    "ESTADOS UNIDOS DE AMÉRICA": (-95.7129, 37.0902),
+    "ESTADOS UNIDOS DE AMERICA": (-95.7129, 37.0902),
+    "CANADÁ":          (-96.8165,  56.1304),
+    "CANADA":          (-96.8165,  56.1304),
+    "PERÚ":            (-75.0152,  -9.1900),
+    "PERU":            (-75.0152,  -9.1900),
+    "CHINA":           (104.1954,  35.8617),
+    "VIETNAM":         (108.2772,  14.0583),
+    "ARGENTINA":       (-63.6167, -38.4161),
+    "BRASIL":          (-51.9253, -14.2350),
+    "VENEZUELA":       (-66.5897,   6.4238),
+    "COSTA RICA":      (-83.7534,   9.7489),
+    "MEXICO":          (-102.5528,  23.6345),
+    "ESPAÑA":          (  -3.7492,  40.4637),
+    "SUDAFRICA":       ( 22.9375,  -30.5595),
+    # Añadidos tras diagnóstico del parquet (33 países con datos sin coordenadas)
+    "BÉLGICA":         (  4.4699,  50.5039),
+    "BOLIVIA":         (-64.9909, -16.2902),
+    "ITALIA":          ( 12.5674,  41.8719),
+    "FRANCIA":         (  2.3488,  46.2276),
+    "PANAMÁ":          (-80.7821,   8.9936),
+    "URUGUAY":         (-55.7658, -32.5228),
+    "PAÍSES BAJOS":    (  5.2913,  52.1326),
+    "AFGANISTÁN":      ( 67.7100,  33.9391),
+    "INDIA":           ( 78.9629,  20.5937),
+    "NICARAGUA":       (-85.2072,  12.8654),
+    "NUEVA ZELANDA":   (174.8860, -40.9006),
+    "POLONIA":         ( 19.1451,  51.9194),
+    "PORTUGAL":        ( -8.2245,  39.3999),
+    "ESCOCIA":         ( -4.2026,  56.4907),
+    "PARAGUAY":        (-58.4438, -23.4425),
+    "GUATEMALA":       (-90.2308,  15.7835),
+    "GRECIA":          ( 21.8243,  39.0742),
+    "ALEMANIA":        ( 10.4515,  51.1657),
+    "TURQUIA":         ( 35.2433,  38.9637),
+    "HONDURAS":        (-86.2419,  15.2000),
+    "GRAN BRETAÑA":    ( -3.4359,  55.3781),
+    "IRLANDA":         ( -8.2439,  53.4129),
+    "UZBEKISTÁN":      ( 64.5853,  41.3775),
+    "BELICE":          (-88.4976,  17.1899),
+    "BULGARIA":        ( 25.4858,  42.7339),
+    "TAIWÁN":          (120.9605,  23.6978),
+    "BAHAMAS":         (-77.3963,  25.0343),
+    "PAKISTÁN":        ( 69.3451,  30.3753),
+    "NORUEGA":         (  8.4689,  60.4720),
+    "SUECIA":          ( 18.6435,  60.1282),
+    "PUERTO RICO":     (-66.5901,  18.2208),
+    "UGANDA":          ( 32.2903,   1.3733),
+    "MÉXICO":          (-102.5528,  23.6345),
 }
 
 # =========================================================
@@ -420,7 +463,16 @@ def consultar_catalogos(mtime_ab, mtime_pr):
     if "INTERNACIONAL" not in deptos:
         deptos.append("INTERNACIONAL")
     municipios_raw = ca.execute("""
-        SELECT DISTINCT municipio_origen, departamento_origen
+        SELECT DISTINCT
+            municipio_origen,
+            departamento_origen,
+            CASE
+                WHEN UPPER(municipio_origen) = 'UNE'      THEN '25845'
+                WHEN UPPER(municipio_origen) = 'FÓMEQUE'  THEN '25279'
+                WHEN UPPER(municipio_origen) = 'FOMEQUE'  THEN '25279'
+                WHEN UPPER(municipio_origen) = 'CERRITO'  THEN '68162'
+                ELSE cod_municipio
+            END AS cod_municipio
         FROM lineas WHERE municipio_origen IS NOT NULL
         ORDER BY municipio_origen
     """).df()
@@ -431,13 +483,16 @@ def consultar_catalogos(mtime_ab, mtime_pr):
 
 @st.cache_data(show_spinner=False)
 def consultar_paises(mtime_intl):
+    """Devuelve solo los países que tienen datos en el parquet, excluyendo Colombia."""
     if not RUTA_INTERNACIONALES.exists():
         return []
     con = get_con_intl(mtime_intl)
     df = con.execute("""
-        SELECT DISTINCT pais_origen FROM internacionales
-        WHERE UPPER(TRIM(pais_origen)) != 'COLOMBIA'
-        ORDER BY pais_origen
+        SELECT DISTINCT TRIM(pais_origen) AS pais_origen
+        FROM internacionales
+        WHERE UPPER(TRIM(pais_origen)) NOT IN ('COLOMBIA', '')
+          AND pais_origen IS NOT NULL
+        ORDER BY 1
     """).df()
     return df["pais_origen"].tolist()
 
@@ -941,10 +996,18 @@ if incluir_intl and not excluir_intl_por_depto:
 else:
     intl_raw = pd.DataFrame()
 if not intl_raw.empty:
-    intl_raw["lon_orig"] = intl_raw["pais_origen"].str.upper().map(
-        {k: v[0] for k, v in PAISES_COORDS.items()})
-    intl_raw["lat_orig"] = intl_raw["pais_origen"].str.upper().map(
-        {k: v[1] for k, v in PAISES_COORDS.items()})
+    # Lookup de coordenadas robusto: normaliza acentos y mayúsculas en ambos lados
+    # para que MÉXICO, Mexico, MEXICO, etc. todos encuentren su entrada en PAISES_COORDS.
+    def _norm_pais(s):
+        s = str(s).upper().strip()
+        return "".join(c for c in unicodedata.normalize("NFD", s)
+                       if unicodedata.category(c) != "Mn")
+    _lookup_lon = {_norm_pais(k): v[0] for k, v in PAISES_COORDS.items()}
+    _lookup_lat = {_norm_pais(k): v[1] for k, v in PAISES_COORDS.items()}
+    _coords_lon = intl_raw["pais_origen"].map(lambda p: _lookup_lon.get(_norm_pais(p)))
+    _coords_lat = intl_raw["pais_origen"].map(lambda p: _lookup_lat.get(_norm_pais(p)))
+    intl_raw["lon_orig"] = intl_raw["lon_orig"].combine_first(_coords_lon)
+    intl_raw["lat_orig"] = intl_raw["lat_orig"].combine_first(_coords_lat)
     intl_df = intl_raw.dropna(subset=["lon_orig","lat_orig","lon_dest","lat_dest"]).copy()
     if not intl_df.empty:
         vi = intl_df["toneladas_total"].sum()
@@ -1190,13 +1253,25 @@ geojson_mun = json.loads(
              "detalle_1","detalle_2","detalle_3","detalle_4","geometry"]].to_json()
 )
 
-# Centrales como puntos
+# Centrales como puntos — fusionar nacionales e internacionales
+# para que siempre sean visibles independientemente del filtro activo
+_cent_parts = []
 if not flujos_df.empty:
-    cent_pts = (
+    _c_nac = (
         flujos_df.groupby("central_mayorista", as_index=False)
         .agg(lon=("lon_dest","first"), lat=("lat_dest","first"),
              nombre=("central_mayorista","first"))
     ).dropna(subset=["lon","lat"])
+    _cent_parts.append(_c_nac)
+if not intl_df.empty:
+    _c_intl = intl_df.groupby("central_mayorista", as_index=False).agg(
+        lon=("lon_dest","first"), lat=("lat_dest","first"),
+        nombre=("central_mayorista","first")
+    ).dropna(subset=["lon","lat"])
+    _cent_parts.append(_c_intl)
+if _cent_parts:
+    cent_pts = pd.concat(_cent_parts, ignore_index=True)
+    cent_pts = cent_pts.drop_duplicates(subset=["central_mayorista"]).reset_index(drop=True)
     cent_pts["tipo_elemento"] = "Central mayorista"
     cent_pts["detalle_1"]     = "Central: " + cent_pts["nombre"].fillna("")
     cent_pts["detalle_2"]     = ""
