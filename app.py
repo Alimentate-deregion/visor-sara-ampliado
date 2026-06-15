@@ -2020,7 +2020,8 @@ with tab2:
                     "ArcLayer", data=flujos_top,
                     get_source_position=["lon_orig","lat_orig"],
                     get_target_position=["lon_dest","lat_dest"],
-                    get_source_color="color", get_target_color="color",
+                    get_source_color=[245,176,65,190],
+                    get_target_color=[0,210,255,190],
                     get_width="ancho", width_scale=1, width_min_pixels=1,
                     pickable=True, auto_highlight=True
                 )]
