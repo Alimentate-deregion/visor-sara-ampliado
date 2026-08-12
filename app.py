@@ -26,6 +26,7 @@ RUTA_LINEAS      = BASE_DIR / "lineas_abastecimiento.parquet"
 RUTA_MUNICIPIOS  = BASE_DIR / "municipios_ligeros.parquet"
 RUTA_PRECIOS     = BASE_DIR / "precios_rubros.parquet"
 RUTA_INTERNACIONALES  = BASE_DIR / "lineas_internacionales.parquet"
+RUTA_MINORISTAS       = BASE_DIR / "precios_minoristas_bogota_2026.csv"
 RUTA_LOGO             = BASE_DIR / "MDS-245-ES.jpg"
 RUTA_LINEAS_SQL       = RUTA_LINEAS.as_posix()
 RUTA_PRECIOS_SQL      = RUTA_PRECIOS.as_posix()
@@ -908,14 +909,19 @@ st.markdown(f"""
             Visor de precios y abastecimiento agroalimentario
         </div>
         <div style="font-size:0.92rem;color:#6B7280;margin-top:4px;">
-            Lectura territorial de flujos, precios y eficiencia relativa de municipios de origen
-            por producto y central mayorista · SIPSA–DANE 2020–2026
+            Lectura territorial del abastecimiento mayorista y de los precios minoristas de alimentos
+            · SIPSA–DANE y monitoreo de precios Bogotá · 2020–2026
         </div>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-with st.container():
+tab_mayorista, tab_minorista = st.tabs([
+    "Abastecimiento mayorista",
+    "Precios minoristas Bogotá"
+])
+
+with tab_mayorista:
 
     # ── Estado de filtros SARA (fuente: base territorial suministrada) ──
     solo_priorizados = st.session_state.get("_cb_solo_prio", False)
@@ -1991,3 +1997,404 @@ with st.container():
     render_tabla(rk=rk, vol_filtro=vol_filtro, vol_total=vol_total,
                  vol_rape=vol_rape, max_filas=MAX_FILAS_TABLA,
                  tiene_rubro_unico=tiene_rubro_unico)
+
+# =========================================================
+# PESTAÑA 2 — PRECIOS MINORISTAS BOGOTÁ
+# =========================================================
+
+@st.cache_data(show_spinner=False)
+def cargar_minoristas(mtime):
+    """Carga la base consolidada de monitoreo minorista (febrero–mayo 2026)."""
+    if not RUTA_MINORISTAS.exists():
+        return pd.DataFrame()
+    df = pd.read_csv(RUTA_MINORISTAS, encoding="utf-8-sig")
+    if df.empty:
+        return df
+    df["fecha_recoleccion"] = pd.to_datetime(df["fecha_recoleccion"], errors="coerce")
+    df["valor_unitario"] = pd.to_numeric(df["valor_unitario"], errors="coerce")
+    df["latitud"] = pd.to_numeric(df["latitud"], errors="coerce")
+    df["longitud"] = pd.to_numeric(df["longitud"], errors="coerce")
+    df = df[df["valor_unitario"].notna() & (df["valor_unitario"] > 0)].copy()
+    return df
+
+
+def _mes_label_minorista(mes):
+    labels = {
+        "2026-02": "Febrero 2026",
+        "2026-03": "Marzo 2026",
+        "2026-04": "Abril 2026",
+        "2026-05": "Mayo 2026",
+    }
+    return labels.get(str(mes), str(mes))
+
+
+with tab_minorista:
+    mtime_min = obtener_mtime(RUTA_MINORISTAS)
+    df_min = cargar_minoristas(mtime_min)
+
+    if df_min.empty:
+        st.warning(
+            "No se encontró la base de precios minoristas. Copie "
+            "`precios_minoristas_bogota_2026.csv` dentro de la carpeta `Datos`."
+        )
+    else:
+        st.markdown(
+            """
+            <div class="method-note" style="margin-top:0.2rem;margin-bottom:0.9rem;">
+                <b>Monitoreo de precios minoristas en Bogotá.</b> Cada observación corresponde al precio
+                unitario de un producto registrado en un establecimiento comercial georreferenciado.
+                La visualización no incluye datos personales de contactos o responsables de los comercios.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        # --------------------------
+        # FILTROS
+        # --------------------------
+        st.markdown('<div class="filter-wrap">', unsafe_allow_html=True)
+        mf1, mf2, mf3, mf4 = st.columns([1.2, 1.7, 1.4, 1.5])
+
+        categorias_min = sorted(df_min["clasificacion_producto"].dropna().unique().tolist())
+        with mf1:
+            cat_sel_min = st.selectbox(
+                "Categoría",
+                ["Todas"] + categorias_min,
+                index=0,
+                key="min_categoria",
+            )
+
+        base_productos = df_min if cat_sel_min == "Todas" else df_min[df_min["clasificacion_producto"] == cat_sel_min]
+        productos_min = sorted(base_productos["producto"].dropna().unique().tolist())
+        if productos_min and st.session_state.get("min_producto") not in productos_min:
+            st.session_state["min_producto"] = productos_min[0]
+        with mf2:
+            producto_sel_min = st.selectbox(
+                "Producto",
+                productos_min,
+                index=0 if productos_min else None,
+                key="min_producto",
+            )
+
+        meses_min = sorted(df_min["mes_reporte"].dropna().unique().tolist())
+        mes_labels = {_mes_label_minorista(m): m for m in meses_min}
+        with mf3:
+            meses_sel_labels = st.multiselect(
+                "Mes",
+                options=list(mes_labels.keys()),
+                default=list(mes_labels.keys()),
+                key="min_meses",
+            )
+            meses_sel_min = [mes_labels[m] for m in meses_sel_labels]
+
+        comercios_min = sorted(df_min["clasificacion_comercio"].dropna().unique().tolist())
+        with mf4:
+            comercio_sel_min = st.multiselect(
+                "Tipo de comercio",
+                options=comercios_min,
+                default=[],
+                placeholder="Todos los tipos",
+                key="min_comercio",
+            )
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        if not producto_sel_min:
+            st.info("Seleccione un producto para visualizar los precios minoristas.")
+        else:
+            fmin = df_min[df_min["producto"] == producto_sel_min].copy()
+            if meses_sel_min:
+                fmin = fmin[fmin["mes_reporte"].isin(meses_sel_min)]
+            if comercio_sel_min:
+                fmin = fmin[fmin["clasificacion_comercio"].isin(comercio_sel_min)]
+            if cat_sel_min != "Todas":
+                fmin = fmin[fmin["clasificacion_producto"] == cat_sel_min]
+
+            # Un establecimiento puede tener más de un registro del mismo producto.
+            # Para mapa e indicadores se usa la mediana por establecimiento y mes,
+            # evitando sobreponderar establecimientos con registros duplicados.
+            est_mes = (
+                fmin.groupby(
+                    [
+                        "mes_reporte", "establecimiento_id", "establecimiento",
+                        "latitud", "longitud", "direccion", "clasificacion_comercio"
+                    ],
+                    dropna=False,
+                    as_index=False,
+                )
+                .agg(
+                    precio=("valor_unitario", "median"),
+                    precio_min=("valor_unitario", "min"),
+                    precio_max=("valor_unitario", "max"),
+                    n_registros=("valor_unitario", "size"),
+                    fecha_recoleccion=("fecha_recoleccion", "max"),
+                )
+            )
+
+            # Para un periodo con varios meses, cada establecimiento pesa una vez por mes.
+            precios_analisis = est_mes["precio"].dropna()
+            precio_mediana = precios_analisis.median() if not precios_analisis.empty else np.nan
+            precio_promedio = precios_analisis.mean() if not precios_analisis.empty else np.nan
+            precio_minimo = precios_analisis.min() if not precios_analisis.empty else np.nan
+            precio_maximo = precios_analisis.max() if not precios_analisis.empty else np.nan
+            n_est = fmin["establecimiento_id"].nunique()
+            n_obs = len(fmin)
+
+            unidad_vals = fmin["unidad_medida"].dropna().astype(str)
+            unidad_vals = unidad_vals[unidad_vals.str.strip() != ""]
+            unidad = unidad_vals.mode().iloc[0] if not unidad_vals.empty else "unidad reportada"
+
+            # --------------------------
+            # KPIs
+            # --------------------------
+            k1, k2, k3, k4, k5 = st.columns(5)
+            kpis = [
+                (k1, "Precio mediano", formatear_cop(precio_mediana), f"Por {unidad.lower()}"),
+                (k2, "Precio promedio", formatear_cop(precio_promedio), f"Por {unidad.lower()}"),
+                (k3, "Precio mínimo", formatear_cop(precio_minimo), "Observado"),
+                (k4, "Precio máximo", formatear_cop(precio_maximo), "Observado"),
+                (k5, "Establecimientos", f"{n_est:,}", f"{n_obs:,} registros"),
+            ]
+            for col, label, value, small in kpis:
+                with col:
+                    st.markdown(
+                        f"""
+                        <div class="metric-card">
+                            <div class="metric-label">{label}</div>
+                            <div class="metric-value" style="font-size:1.55rem;">{value}</div>
+                            <div class="metric-small">{small}</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
+            # --------------------------
+            # MAPA + RESUMEN
+            # --------------------------
+            map_col, side_col = st.columns([2.35, 1.0])
+
+            with map_col:
+                st.markdown('<div class="panel-title">Mapa de precios minoristas por establecimiento</div>', unsafe_allow_html=True)
+                puntos = est_mes.dropna(subset=["latitud", "longitud", "precio"]).copy()
+                puntos = puntos[
+                    puntos["latitud"].between(4.3, 4.95)
+                    & puntos["longitud"].between(-74.4, -73.9)
+                ]
+
+                if not puntos.empty:
+                    # Un punto por establecimiento para el periodo seleccionado.
+                    puntos_mapa = (
+                        puntos.groupby(
+                            ["establecimiento_id", "establecimiento", "latitud", "longitud", "direccion", "clasificacion_comercio"],
+                            dropna=False,
+                            as_index=False,
+                        )
+                        .agg(
+                            precio=("precio", "median"),
+                            precio_min=("precio_min", "min"),
+                            precio_max=("precio_max", "max"),
+                            meses=("mes_reporte", "nunique"),
+                            registros=("n_registros", "sum"),
+                        )
+                    )
+                    q33 = puntos_mapa["precio"].quantile(0.33)
+                    q67 = puntos_mapa["precio"].quantile(0.67)
+
+                    def nivel_precio(v):
+                        if v <= q33:
+                            return "Precio bajo", [0, 200, 120, 210]
+                        if v <= q67:
+                            return "Precio medio", [245, 176, 65, 220]
+                        return "Precio alto", [255, 99, 132, 220]
+
+                    niveles = puntos_mapa["precio"].apply(nivel_precio)
+                    puntos_mapa["nivel_precio"] = niveles.apply(lambda x: x[0])
+                    puntos_mapa["color"] = niveles.apply(lambda x: x[1])
+                    puntos_mapa["precio_fmt"] = puntos_mapa["precio"].map(formatear_cop)
+                    puntos_mapa["rango_fmt"] = puntos_mapa.apply(
+                        lambda r: f"{formatear_cop(r['precio_min'])} – {formatear_cop(r['precio_max'])}", axis=1
+                    )
+
+                    layer = pdk.Layer(
+                        "ScatterplotLayer",
+                        data=puntos_mapa,
+                        get_position="[longitud, latitud]",
+                        get_fill_color="color",
+                        get_radius=85,
+                        radius_min_pixels=5,
+                        radius_max_pixels=12,
+                        pickable=True,
+                        stroked=True,
+                        get_line_color=[235, 240, 248, 180],
+                        line_width_min_pixels=1,
+                    )
+                    view = pdk.ViewState(latitude=4.65, longitude=-74.10, zoom=10.4, pitch=0)
+                    tooltip = {
+                        "html": (
+                            "<b>{establecimiento}</b><br/>"
+                            "Precio mediano: <b>{precio_fmt}</b><br/>"
+                            "Rango observado: {rango_fmt}<br/>"
+                            "Nivel: {nivel_precio}<br/>"
+                            "Comercio: {clasificacion_comercio}<br/>"
+                            "Dirección: {direccion}<br/>"
+                            "Meses observados: {meses}"
+                        ),
+                        "style": {"backgroundColor": "#111827", "color": "#F3F4F6"},
+                    }
+                    st.pydeck_chart(
+                        pdk.Deck(
+                            layers=[layer],
+                            initial_view_state=view,
+                            tooltip=tooltip,
+                            map_style="dark",
+                        ),
+                        use_container_width=True,
+                        height=515,
+                    )
+                else:
+                    puntos_mapa = pd.DataFrame()
+                    st.info("No hay establecimientos con coordenadas válidas bajo los filtros actuales.")
+
+            with side_col:
+                st.markdown('<div class="panel">', unsafe_allow_html=True)
+                st.markdown('<div class="panel-title">Lectura del mapa</div>', unsafe_allow_html=True)
+                st.markdown(
+                    """
+                    <div class="legend-item"><span class="legend-box" style="background:#00C878;"></span>Precio bajo</div>
+                    <div class="legend-item"><span class="legend-box" style="background:#F5B041;"></span>Precio medio</div>
+                    <div class="legend-item"><span class="legend-box" style="background:#FF6384;"></span>Precio alto</div>
+                    <div class="small-note" style="margin-top:0.7rem;">
+                        Los niveles son relativos al producto y periodo filtrados. Se calculan con los
+                        percentiles 33 y 67 de los precios medianos por establecimiento; no representan
+                        umbrales oficiales de precio.
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                st.markdown('</div>', unsafe_allow_html=True)
+
+                st.markdown('<div class="panel" style="margin-top:0.8rem;">', unsafe_allow_html=True)
+                st.markdown('<div class="panel-title">Cobertura del filtro</div>', unsafe_allow_html=True)
+                n_geo = puntos_mapa["establecimiento_id"].nunique() if not puntos_mapa.empty else 0
+                st.markdown(
+                    f"""
+                    <div class="small-note">
+                        <b>{n_geo:,}</b> establecimientos visibles en mapa<br/>
+                        <b>{est_mes['mes_reporte'].nunique():,}</b> meses incluidos<br/>
+                        <b>{fmin['clasificacion_comercio'].nunique():,}</b> tipos de comercio<br/>
+                        Unidad predominante: <b>{unidad}</b>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                st.markdown('</div>', unsafe_allow_html=True)
+
+            # --------------------------
+            # GRÁFICOS
+            # --------------------------
+            g1, g2 = st.columns(2)
+
+            with g1:
+                st.markdown('<div class="panel-title">Distribución del precio por tipo de comercio</div>', unsafe_allow_html=True)
+                fig_box = go.Figure()
+                for comercio in sorted(est_mes["clasificacion_comercio"].dropna().unique().tolist()):
+                    vals = est_mes.loc[est_mes["clasificacion_comercio"] == comercio, "precio"].dropna()
+                    if vals.empty:
+                        continue
+                    fig_box.add_trace(
+                        go.Box(
+                            y=vals,
+                            name=comercio,
+                            boxmean=True,
+                            boxpoints="outliers",
+                            hovertemplate=f"{comercio}<br>$ %{{y:,.0f}}<extra></extra>",
+                        )
+                    )
+                fig_box.update_layout(
+                    template="plotly_dark",
+                    paper_bgcolor="#171A21",
+                    plot_bgcolor="#171A21",
+                    height=390,
+                    margin=dict(l=15, r=15, t=10, b=20),
+                    yaxis_title=f"Precio por {unidad.lower()} (COP)",
+                    xaxis_title="",
+                    showlegend=False,
+                )
+                st.plotly_chart(fig_box, use_container_width=True)
+
+            with g2:
+                st.markdown('<div class="panel-title">Evolución mensual del precio</div>', unsafe_allow_html=True)
+                mensual = (
+                    est_mes.groupby("mes_reporte", as_index=False)
+                    .agg(
+                        mediana=("precio", "median"),
+                        promedio=("precio", "mean"),
+                        establecimientos=("establecimiento_id", "nunique"),
+                    )
+                    .sort_values("mes_reporte")
+                )
+                mensual["mes_label"] = mensual["mes_reporte"].map(_mes_label_minorista)
+                fig_mes = go.Figure()
+                fig_mes.add_trace(
+                    go.Scatter(
+                        x=mensual["mes_label"], y=mensual["mediana"],
+                        mode="lines+markers", name="Mediana",
+                        customdata=mensual[["establecimientos"]],
+                        hovertemplate="%{x}<br>Mediana: $ %{y:,.0f}<br>Establecimientos: %{customdata[0]}<extra></extra>",
+                    )
+                )
+                fig_mes.add_trace(
+                    go.Scatter(
+                        x=mensual["mes_label"], y=mensual["promedio"],
+                        mode="lines+markers", name="Promedio",
+                        hovertemplate="%{x}<br>Promedio: $ %{y:,.0f}<extra></extra>",
+                    )
+                )
+                fig_mes.update_layout(
+                    template="plotly_dark",
+                    paper_bgcolor="#171A21",
+                    plot_bgcolor="#171A21",
+                    height=390,
+                    margin=dict(l=15, r=15, t=10, b=20),
+                    yaxis_title=f"Precio por {unidad.lower()} (COP)",
+                    xaxis_title="",
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+                )
+                st.plotly_chart(fig_mes, use_container_width=True)
+
+            # --------------------------
+            # TABLA
+            # --------------------------
+            st.markdown('<div class="panel-title" style="margin-top:0.8rem;">Detalle de observaciones minoristas</div>', unsafe_allow_html=True)
+            tabla_min = fmin[
+                [
+                    "fecha_recoleccion", "establecimiento", "clasificacion_comercio",
+                    "producto", "unidad_medida", "valor_unitario", "direccion"
+                ]
+            ].copy()
+            tabla_min = tabla_min.sort_values(["fecha_recoleccion", "establecimiento"], ascending=[False, True])
+            tabla_min["fecha_recoleccion"] = tabla_min["fecha_recoleccion"].dt.strftime("%Y-%m-%d")
+            tabla_min["valor_unitario"] = tabla_min["valor_unitario"].map(lambda x: f"$ {x:,.0f}")
+            tabla_min.columns = [
+                "Fecha", "Establecimiento", "Tipo de comercio", "Producto",
+                "Unidad", "Precio unitario", "Dirección"
+            ]
+            st.dataframe(tabla_min.head(500), use_container_width=True, hide_index=True, height=420)
+
+            st.markdown(
+                """
+                <div class="method-note">
+                    <b>Metodología de esta primera versión:</b> los indicadores y el mapa usan la mediana
+                    del precio por establecimiento y mes para evitar que registros duplicados de un mismo
+                    producto sobreponderen un comercio. La mediana general resume esas observaciones
+                    establecimiento–mes. Los puntos sin coordenadas válidas se conservan en indicadores y
+                    tabla, pero no se dibujan en el mapa.
+                </div>
+                <div style="margin-top:0.8rem;padding-top:0.6rem;border-top:1px solid #2B3240;
+                    color:#8FA0B7;font-size:0.8rem;text-align:center;">
+                    Fuente: Monitoreo de precios minoristas de Bogotá · febrero–mayo 2026
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
