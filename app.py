@@ -3,6 +3,7 @@ import json
 import html
 import unicodedata
 from pathlib import Path
+from urllib.request import Request, urlopen
 
 import duckdb
 import geopandas as gpd
@@ -28,6 +29,12 @@ RUTA_MUNICIPIOS  = BASE_DIR / "municipios_ligeros.parquet"
 RUTA_PRECIOS     = BASE_DIR / "precios_rubros.parquet"
 RUTA_INTERNACIONALES  = BASE_DIR / "lineas_internacionales.parquet"
 RUTA_MINORISTAS       = BASE_DIR / "precios_minoristas_bogota_2026.csv"
+RUTA_LOCALIDADES       = BASE_DIR / "localidades_bogota.geojson"
+URL_LOCALIDADES_IDECA  = (
+    "https://serviciosgis.catastrobogota.gov.co/arcgis/rest/services/"
+    "ordenamientoterritorial/localidad/MapServer/0/query"
+    "?where=1%3D1&outFields=LOCNOMBRE&returnGeometry=true&outSR=4326&f=geojson"
+)
 RUTA_LOGO             = BASE_DIR / "MDS-245-ES.jpg"
 RUTA_LINEAS_SQL       = RUTA_LINEAS.as_posix()
 RUTA_PRECIOS_SQL      = RUTA_PRECIOS.as_posix()
@@ -2029,6 +2036,73 @@ def _mes_label_minorista(mes):
     return labels.get(str(mes), str(mes))
 
 
+LOCALIDAD_LABELS = {
+    "ANTONIO NARIÑO": "Antonio Nariño",
+    "BARRIOS UNIDOS": "Barrios Unidos",
+    "BOSA": "Bosa",
+    "CANDELARIA": "Candelaria",
+    "CHAPINERO": "Chapinero",
+    "CIUDAD BOLIVAR": "Ciudad Bolívar",
+    "ENGATIVA": "Engativá",
+    "FONTIBON": "Fontibón",
+    "KENNEDY": "Kennedy",
+    "LOS MARTIRES": "Los Mártires",
+    "PUENTE ARANDA": "Puente Aranda",
+    "RAFAEL URIBE URIBE": "Rafael Uribe Uribe",
+    "SAN CRISTOBAL": "San Cristóbal",
+    "SANTA FE": "Santa Fe",
+    "SUBA": "Suba",
+    "SUMAPAZ": "Sumapaz",
+    "TEUSAQUILLO": "Teusaquillo",
+    "TUNJUELITO": "Tunjuelito",
+    "USAQUEN": "Usaquén",
+    "USME": "Usme",
+}
+
+
+@st.cache_data(show_spinner=False, ttl=86400)
+def cargar_localidades_bogota():
+    # Capa oficial de localidades de Bogotá (IDECA/SDP).
+    try:
+        if RUTA_LOCALIDADES.exists():
+            gdf = gpd.read_file(RUTA_LOCALIDADES)
+        else:
+            req = Request(URL_LOCALIDADES_IDECA, headers={"User-Agent": "Mozilla/5.0"})
+            with urlopen(req, timeout=25) as response:
+                data = json.load(response)
+            gdf = gpd.GeoDataFrame.from_features(data.get("features", []), crs="EPSG:4326")
+
+        if gdf.empty or "LOCNOMBRE" not in gdf.columns:
+            return gpd.GeoDataFrame()
+        if gdf.crs is None:
+            gdf = gdf.set_crs(epsg=4326)
+        else:
+            gdf = gdf.to_crs(epsg=4326)
+        gdf = gdf[["LOCNOMBRE", "geometry"]].copy()
+        gdf["localidad"] = gdf["LOCNOMBRE"].astype(str).str.strip().str.upper().map(LOCALIDAD_LABELS)
+        gdf["localidad"] = gdf["localidad"].fillna(gdf["LOCNOMBRE"].astype(str).str.title())
+        return gdf[["localidad", "geometry"]]
+    except Exception:
+        return gpd.GeoDataFrame()
+
+
+def asignar_localidad(df_puntos, localidades_gdf):
+    if df_puntos.empty or localidades_gdf.empty:
+        out = df_puntos.copy()
+        out["localidad"] = pd.NA
+        return out
+    base = df_puntos.copy()
+    base["_orden_localidad"] = np.arange(len(base))
+    geo = gpd.GeoDataFrame(
+        base,
+        geometry=gpd.points_from_xy(base["longitud"], base["latitud"]),
+        crs="EPSG:4326",
+    )
+    unido = gpd.sjoin(geo, localidades_gdf, how="left", predicate="intersects")
+    unido = unido.sort_values("_orden_localidad").drop_duplicates("_orden_localidad", keep="first")
+    return pd.DataFrame(unido.drop(columns=["geometry", "index_right", "_orden_localidad"], errors="ignore"))
+
+
 with tab_minorista:
     mtime_min = obtener_mtime(RUTA_MINORISTAS)
     df_min = cargar_minoristas(mtime_min)
@@ -2170,241 +2244,142 @@ with tab_minorista:
                     )
 
             # --------------------------
-            # SEMÁFORO + MAPA
+            # MATRIZ TERRITORIAL + MAPA
             # --------------------------
             st.markdown(
-                """
+                '''
                 <style>
-                    .min-semaforo-wrap {
-                        background:#171A21;
-                        border:1px solid #2B3240;
-                        border-radius:10px;
-                        padding:0.7rem 0.75rem;
-                        height:650px;
-                        overflow-y:auto;
-                    }
-                    .min-semaforo-head {
-                        position:sticky;
-                        top:0;
-                        z-index:2;
-                        background:#171A21;
-                        padding:0 0 0.55rem 0;
-                        margin-bottom:0.2rem;
-                        border-bottom:1px solid #2B3240;
-                    }
-                    .min-semaforo-row {
-                        display:grid;
-                        grid-template-columns:13px minmax(0,1fr) auto;
-                        gap:0.45rem;
-                        align-items:center;
-                        padding:0.46rem 0.46rem;
-                        margin:0.28rem 0;
-                        border-radius:7px;
-                        border:1px solid rgba(255,255,255,0.055);
-                    }
-                    .min-semaforo-dot {
-                        width:10px;
-                        height:10px;
-                        border-radius:50%;
-                        box-shadow:0 0 0 2px rgba(255,255,255,0.08);
-                    }
-                    .min-semaforo-name {
-                        color:#E8EDF5;
-                        font-size:0.78rem;
-                        font-weight:600;
-                        white-space:nowrap;
-                        overflow:hidden;
-                        text-overflow:ellipsis;
-                    }
-                    .min-semaforo-sub {
-                        color:#8FA0B7;
-                        font-size:0.66rem;
-                        margin-top:1px;
-                        white-space:nowrap;
-                        overflow:hidden;
-                        text-overflow:ellipsis;
-                    }
-                    .min-semaforo-price {
-                        color:#F5F7FA;
-                        font-size:0.78rem;
-                        font-weight:700;
-                        text-align:right;
-                    }
-                    .min-map-toolbar {
-                        display:flex;
-                        flex-wrap:wrap;
-                        justify-content:flex-end;
-                        gap:0.38rem;
-                        margin:-0.15rem 0 0.45rem 0;
-                    }
-                    .min-map-chip {
-                        background:#1E2530;
-                        border:1px solid #303949;
-                        border-radius:7px;
-                        padding:0.30rem 0.52rem;
-                        min-width:92px;
-                        text-align:right;
-                    }
-                    .min-map-chip-label {
-                        color:#8FA0B7;
-                        font-size:0.61rem;
-                        line-height:1.05;
-                    }
-                    .min-map-chip-value {
-                        color:#F5F7FA;
-                        font-size:0.80rem;
-                        font-weight:700;
-                        line-height:1.15;
-                        margin-top:2px;
-                    }
-                    .min-legend-compact {
-                        display:flex;
-                        flex-wrap:wrap;
-                        align-items:center;
-                        gap:0.55rem 1rem;
-                        background:#171A21;
-                        border:1px solid #2B3240;
-                        border-radius:9px;
-                        padding:0.55rem 0.75rem;
-                        margin:0.45rem 0 0.95rem 0;
-                    }
-                    .min-legend-title {
-                        color:#F5F7FA;
-                        font-size:0.76rem;
-                        font-weight:700;
-                        margin-right:0.25rem;
-                    }
-                    .min-legend-item {
-                        display:flex;
-                        align-items:center;
-                        gap:0.34rem;
-                        color:#C8D8F0;
-                        font-size:0.70rem;
-                    }
-                    .min-legend-swatch {
-                        width:10px;
-                        height:10px;
-                        border-radius:2px;
-                    }
-                    .min-legend-note {
-                        color:#8FA0B7;
-                        font-size:0.66rem;
-                        flex:1 1 330px;
-                    }
+                    .min-map-toolbar {display:flex;flex-wrap:wrap;justify-content:flex-end;gap:0.38rem;margin:-0.15rem 0 0.45rem 0;}
+                    .min-map-chip {background:#1E2530;border:1px solid #303949;border-radius:7px;padding:0.30rem 0.52rem;min-width:88px;text-align:right;}
+                    .min-map-chip-label {color:#8FA0B7;font-size:0.61rem;line-height:1.05;}
+                    .min-map-chip-value {color:#F5F7FA;font-size:0.80rem;font-weight:700;line-height:1.15;margin-top:2px;}
+                    .min-legend-compact {display:flex;flex-wrap:wrap;align-items:center;gap:0.55rem 1rem;background:#171A21;border:1px solid #2B3240;border-radius:9px;padding:0.55rem 0.75rem;margin:0.45rem 0 0.95rem 0;}
+                    .min-legend-title {color:#F5F7FA;font-size:0.76rem;font-weight:700;margin-right:0.25rem;}
+                    .min-legend-item {display:flex;align-items:center;gap:0.34rem;color:#C8D8F0;font-size:0.70rem;}
+                    .min-legend-swatch {width:10px;height:10px;border-radius:2px;}
+                    .min-legend-note {color:#8FA0B7;font-size:0.66rem;flex:1 1 330px;}
+                    .min-matrix-note {color:#8FA0B7;font-size:0.67rem;line-height:1.35;background:#171A21;border:1px solid #2B3240;border-radius:8px;padding:0.48rem 0.60rem;margin-top:0.32rem;}
                 </style>
-                """,
+                ''',
                 unsafe_allow_html=True,
             )
 
-            # Primero se construye una observación única por establecimiento para todo
-            # el periodo filtrado. El precio representativo es la mediana de sus meses.
             puntos = est_mes.dropna(subset=["latitud", "longitud", "precio"]).copy()
-            puntos = puntos[
-                puntos["latitud"].between(4.3, 4.95)
-                & puntos["longitud"].between(-74.4, -73.9)
-            ]
+            puntos = puntos[puntos["latitud"].between(4.3, 4.95) & puntos["longitud"].between(-74.4, -73.9)]
 
             if not puntos.empty:
                 puntos_mapa = (
                     puntos.groupby(
                         ["establecimiento_id", "establecimiento", "latitud", "longitud", "direccion", "clasificacion_comercio"],
-                        dropna=False,
-                        as_index=False,
+                        dropna=False, as_index=False,
                     )
-                    .agg(
-                        precio=("precio", "median"),
-                        precio_min=("precio_min", "min"),
-                        precio_max=("precio_max", "max"),
-                        meses=("mes_reporte", "nunique"),
-                        registros=("n_registros", "sum"),
-                    )
+                    .agg(precio=("precio", "median"), precio_min=("precio_min", "min"), precio_max=("precio_max", "max"), meses=("mes_reporte", "nunique"), registros=("n_registros", "sum"))
                 )
-
                 q33 = puntos_mapa["precio"].quantile(0.33)
                 q67 = puntos_mapa["precio"].quantile(0.67)
 
                 def nivel_precio(v):
-                    if v <= q33:
-                        return "Precio bajo", [0, 200, 120, 210], "#00C878", "rgba(0,200,120,0.10)"
-                    if v <= q67:
-                        return "Precio medio", [245, 176, 65, 220], "#F5B041", "rgba(245,176,65,0.10)"
-                    return "Precio alto", [255, 99, 132, 220], "#FF6384", "rgba(255,99,132,0.10)"
+                    if v <= q33: return "Precio bajo", [0, 200, 120, 210]
+                    if v <= q67: return "Precio medio", [245, 176, 65, 220]
+                    return "Precio alto", [255, 99, 132, 220]
 
                 niveles = puntos_mapa["precio"].apply(nivel_precio)
                 puntos_mapa["nivel_precio"] = niveles.apply(lambda x: x[0])
                 puntos_mapa["color"] = niveles.apply(lambda x: x[1])
-                puntos_mapa["color_hex"] = niveles.apply(lambda x: x[2])
-                puntos_mapa["fondo_nivel"] = niveles.apply(lambda x: x[3])
                 puntos_mapa["precio_fmt"] = puntos_mapa["precio"].map(formatear_cop)
-                puntos_mapa["rango_fmt"] = puntos_mapa.apply(
-                    lambda r: f"{formatear_cop(r['precio_min'])} – {formatear_cop(r['precio_max'])}", axis=1
-                )
+                puntos_mapa["rango_fmt"] = puntos_mapa.apply(lambda r: f"{formatear_cop(r['precio_min'])} – {formatear_cop(r['precio_max'])}", axis=1)
             else:
-                puntos_mapa = pd.DataFrame()
-                q33 = np.nan
-                q67 = np.nan
+                puntos_mapa = pd.DataFrame(); q33 = np.nan; q67 = np.nan
+
+            localidades_gdf = cargar_localidades_bogota()
+            est_mes_geo = pd.DataFrame()
+            if not puntos.empty and not localidades_gdf.empty:
+                est_mes_geo = asignar_localidad(puntos, localidades_gdf)
+                est_mes_geo = est_mes_geo[est_mes_geo["localidad"].notna()].copy()
 
             n_geo = puntos_mapa["establecimiento_id"].nunique() if not puntos_mapa.empty else 0
             cobertura_geo = (100.0 * n_geo / n_est) if n_est else 0.0
             n_meses_filtro = est_mes["mes_reporte"].nunique() if not est_mes.empty else 0
             n_tipos_filtro = fmin["clasificacion_comercio"].nunique() if not fmin.empty else 0
+            n_localidades = est_mes_geo["localidad"].nunique() if not est_mes_geo.empty else 0
 
-            # ── Mapa de precios minoristas a ancho completo ────────────
-            st.markdown('<div class="panel-title">Mapa de precios minoristas por establecimiento</div>', unsafe_allow_html=True)
+            col_matrix, col_map = st.columns([1.05, 1.70], gap="medium")
 
-            # Widgets compactos de cobertura: quedan en la franja superior del mapa,
-            # sin superponerse a la cartografía.
-            st.markdown(
-                f'''<div class="min-map-toolbar">
-                    <div class="min-map-chip"><div class="min-map-chip-label">Establecimientos filtro</div><div class="min-map-chip-value">{n_est:,}</div></div>
-                    <div class="min-map-chip"><div class="min-map-chip-label">Visibles en mapa</div><div class="min-map-chip-value">{n_geo:,}</div></div>
-                    <div class="min-map-chip"><div class="min-map-chip-label">Cobertura geográfica</div><div class="min-map-chip-value">{cobertura_geo:.1f}%</div></div>
-                    <div class="min-map-chip"><div class="min-map-chip-label">Meses · tipos</div><div class="min-map-chip-value">{n_meses_filtro} · {n_tipos_filtro}</div></div>
-                </div>''',
-                unsafe_allow_html=True,
-            )
+            with col_matrix:
+                st.markdown('<div class="panel-title">Mapa de calor por localidad y tipo de comercio</div>', unsafe_allow_html=True)
+                if est_mes_geo.empty:
+                    st.info("No fue posible asignar localidades en este momento. El mapa de establecimientos permanece disponible.")
+                else:
+                    matriz_long = est_mes_geo.groupby(["localidad", "clasificacion_comercio"], as_index=False).agg(
+                        precio=("precio", "median"), establecimientos=("establecimiento_id", "nunique"), observaciones=("precio", "size")
+                    )
+                    matriz_long["nivel"] = np.nan
+                    matriz_long["nivel_txt"] = "Sin dato"
+                    for tipo in matriz_long["clasificacion_comercio"].dropna().unique():
+                        mask = matriz_long["clasificacion_comercio"] == tipo
+                        vals = matriz_long.loc[mask, "precio"].dropna()
+                        if vals.empty: continue
+                        p33_tipo = vals.quantile(0.33); p67_tipo = vals.quantile(0.67)
+                        niveles_tipo = np.select(
+                            [matriz_long.loc[mask, "precio"] <= p33_tipo, matriz_long.loc[mask, "precio"] <= p67_tipo],
+                            [0.0, 1.0], default=2.0,
+                        )
+                        matriz_long.loc[mask, "nivel"] = niveles_tipo
+                        matriz_long.loc[mask, "nivel_txt"] = pd.Series(niveles_tipo).map({0.0:"Precio bajo",1.0:"Precio medio",2.0:"Precio alto"}).values
 
-            if not puntos_mapa.empty:
-                layer = pdk.Layer(
-                    "ScatterplotLayer",
-                    data=puntos_mapa,
-                    get_position="[longitud, latitud]",
-                    get_fill_color="color",
-                    get_radius=85,
-                    radius_min_pixels=5,
-                    radius_max_pixels=12,
-                    pickable=True,
-                    stroked=True,
-                    get_line_color=[235, 240, 248, 180],
-                    line_width_min_pixels=1,
+                    localidades_orden = sorted(matriz_long["localidad"].dropna().unique().tolist())
+                    tipos_orden = sorted(matriz_long["clasificacion_comercio"].dropna().unique().tolist())
+                    z_df = matriz_long.pivot(index="localidad", columns="clasificacion_comercio", values="nivel").reindex(index=localidades_orden, columns=tipos_orden)
+                    precio_df = matriz_long.pivot(index="localidad", columns="clasificacion_comercio", values="precio").reindex(index=localidades_orden, columns=tipos_orden)
+                    est_df = matriz_long.pivot(index="localidad", columns="clasificacion_comercio", values="establecimientos").reindex(index=localidades_orden, columns=tipos_orden)
+                    obs_df = matriz_long.pivot(index="localidad", columns="clasificacion_comercio", values="observaciones").reindex(index=localidades_orden, columns=tipos_orden)
+                    nivel_df = matriz_long.pivot(index="localidad", columns="clasificacion_comercio", values="nivel_txt").reindex(index=localidades_orden, columns=tipos_orden)
+
+                    texto = precio_df.applymap(lambda v: f"$ {v:,.0f}" if pd.notna(v) else "—")
+                    custom = np.empty((len(localidades_orden), len(tipos_orden), 4), dtype=object)
+                    for i, loc in enumerate(localidades_orden):
+                        for j, tipo in enumerate(tipos_orden):
+                            custom[i,j,0] = formatear_cop(precio_df.loc[loc,tipo]) if pd.notna(precio_df.loc[loc,tipo]) else "Sin dato"
+                            custom[i,j,1] = int(est_df.loc[loc,tipo]) if pd.notna(est_df.loc[loc,tipo]) else 0
+                            custom[i,j,2] = int(obs_df.loc[loc,tipo]) if pd.notna(obs_df.loc[loc,tipo]) else 0
+                            custom[i,j,3] = nivel_df.loc[loc,tipo] if pd.notna(nivel_df.loc[loc,tipo]) else "Sin dato"
+
+                    fig_heat = go.Figure(data=go.Heatmap(
+                        z=z_df.values, x=tipos_orden, y=localidades_orden, zmin=0, zmax=2,
+                        colorscale=[[0.00,"#00C878"],[0.32,"#00C878"],[0.33,"#F5B041"],[0.65,"#F5B041"],[0.66,"#FF6384"],[1.00,"#FF6384"]],
+                        showscale=False, text=texto.values, texttemplate="%{text}", textfont={"size":10,"color":"#111827"},
+                        customdata=custom,
+                        hovertemplate="<b>%{y}</b><br>%{x}<br>Precio mediano: <b>%{customdata[0]}</b><br>Nivel relativo: %{customdata[3]}<br>Establecimientos: %{customdata[1]}<br>Observaciones establecimiento–mes: %{customdata[2]}<extra></extra>",
+                        xgap=3, ygap=3, hoverongaps=False,
+                    ))
+                    fig_heat.update_layout(
+                        template="plotly_dark", paper_bgcolor="#171A21", plot_bgcolor="#171A21", height=620,
+                        margin=dict(l=5,r=5,t=8,b=20),
+                        xaxis=dict(title="",side="top",tickangle=-22,tickfont=dict(size=10,color="#C8D8F0"),automargin=True),
+                        yaxis=dict(title="",autorange="reversed",tickfont=dict(size=10,color="#C8D8F0"),automargin=True),
+                    )
+                    st.plotly_chart(fig_heat, use_container_width=True, config={"displayModeBar":False})
+                    st.markdown('''<div class="min-matrix-note"><b>Cómo leer la matriz:</b> cada columna compara localidades dentro del mismo tipo de comercio. Verde = tercio con precios medianos más bajos; amarillo = tercio intermedio; rojo = tercio más alto. Las celdas muestran el precio mediano del producto bajo los filtros activos.</div>''', unsafe_allow_html=True)
+
+            with col_map:
+                st.markdown('<div class="panel-title">Mapa de precios minoristas por establecimiento</div>', unsafe_allow_html=True)
+                st.markdown(
+                    f'''<div class="min-map-toolbar">
+                        <div class="min-map-chip"><div class="min-map-chip-label">Establecimientos filtro</div><div class="min-map-chip-value">{n_est:,}</div></div>
+                        <div class="min-map-chip"><div class="min-map-chip-label">Visibles en mapa</div><div class="min-map-chip-value">{n_geo:,}</div></div>
+                        <div class="min-map-chip"><div class="min-map-chip-label">Cobertura geográfica</div><div class="min-map-chip-value">{cobertura_geo:.1f}%</div></div>
+                        <div class="min-map-chip"><div class="min-map-chip-label">Localidades con datos</div><div class="min-map-chip-value">{n_localidades}</div></div>
+                        <div class="min-map-chip"><div class="min-map-chip-label">Meses · tipos</div><div class="min-map-chip-value">{n_meses_filtro} · {n_tipos_filtro}</div></div>
+                    </div>''', unsafe_allow_html=True,
                 )
-                view = pdk.ViewState(latitude=4.65, longitude=-74.10, zoom=10.4, pitch=0)
-                tooltip = {
-                    "html": (
-                        "<b>{establecimiento}</b><br/>"
-                        "Precio mediano: <b>{precio_fmt}</b><br/>"
-                        "Rango observado: {rango_fmt}<br/>"
-                        "Nivel: {nivel_precio}<br/>"
-                        "Comercio: {clasificacion_comercio}<br/>"
-                        "Dirección: {direccion}<br/>"
-                        "Meses observados: {meses}"
-                    ),
-                    "style": {"backgroundColor": "#111827", "color": "#F3F4F6"},
-                }
-                st.pydeck_chart(
-                    pdk.Deck(
-                        layers=[layer],
-                        initial_view_state=view,
-                        tooltip=tooltip,
-                        map_style="dark",
-                    ),
-                    use_container_width=True,
-                    height=680,
-                )
-            else:
-                st.info("No hay establecimientos con coordenadas válidas bajo los filtros actuales.")
+                if not puntos_mapa.empty:
+                    layer = pdk.Layer("ScatterplotLayer", data=puntos_mapa, get_position="[longitud, latitud]", get_fill_color="color", get_radius=85, radius_min_pixels=5, radius_max_pixels=12, pickable=True, stroked=True, get_line_color=[235,240,248,180], line_width_min_pixels=1)
+                    view = pdk.ViewState(latitude=4.65, longitude=-74.10, zoom=10.4, pitch=0)
+                    tooltip = {"html":"<b>{establecimiento}</b><br/>Precio mediano: <b>{precio_fmt}</b><br/>Rango observado: {rango_fmt}<br/>Nivel: {nivel_precio}<br/>Comercio: {clasificacion_comercio}<br/>Dirección: {direccion}<br/>Meses observados: {meses}", "style":{"backgroundColor":"#111827","color":"#F3F4F6"}}
+                    st.pydeck_chart(pdk.Deck(layers=[layer], initial_view_state=view, tooltip=tooltip, map_style="dark"), use_container_width=True, height=620)
+                else:
+                    st.info("No hay establecimientos con coordenadas válidas bajo los filtros actuales.")
 
-            # Lectura del mapa compacta, debajo del mapa.
             q33_txt = formatear_cop(q33) if pd.notna(q33) else "—"
             q67_txt = formatear_cop(q67) if pd.notna(q67) else "—"
             st.markdown(
@@ -2413,9 +2388,8 @@ with tab_minorista:
                     <span class="min-legend-item"><span class="min-legend-swatch" style="background:#00C878;"></span>Bajo ≤ P33 ({q33_txt})</span>
                     <span class="min-legend-item"><span class="min-legend-swatch" style="background:#F5B041;"></span>Medio: P33–P67</span>
                     <span class="min-legend-item"><span class="min-legend-swatch" style="background:#FF6384;"></span>Alto &gt; P67 ({q67_txt})</span>
-                    <span class="min-legend-note">Los percentiles 33 y 67 se recalculan con los precios medianos por establecimiento del producto y filtros activos; son niveles relativos de comparación, no umbrales oficiales.</span>
-                </div>''',
-                unsafe_allow_html=True,
+                    <span class="min-legend-note">El mapa clasifica establecimientos con P33/P67 del filtro activo. La matriz usa P33/P67 por tipo de comercio para comparar localidades dentro de cada canal. Son niveles relativos, no umbrales oficiales.</span>
+                </div>''', unsafe_allow_html=True,
             )
 
             # --------------------------
@@ -2517,7 +2491,8 @@ with tab_minorista:
                     del precio por establecimiento y mes para evitar que registros duplicados de un mismo
                     producto sobreponderen un comercio. La mediana general resume esas observaciones
                     establecimiento–mes. Los puntos sin coordenadas válidas se conservan en indicadores y
-                    tabla, pero no se dibujan en el mapa.
+                    tabla, pero no se dibujan en el mapa. La localidad se asigna mediante cruce espacial de
+                    las coordenadas con la capa oficial de Localidades de Bogotá de IDECA/SDP.
                 </div>
                 <div style="margin-top:0.8rem;padding-top:0.6rem;border-top:1px solid #2B3240;
                     color:#8FA0B7;font-size:0.8rem;text-align:center;">
