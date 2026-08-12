@@ -411,7 +411,15 @@ def get_con_abast(mtime):
             YEAR(CAST(fecha_mes AS DATE))                   AS anio,
             TRIM(CAST(grupo AS VARCHAR))                    AS grupo,
             TRIM(CAST(rubro AS VARCHAR))                    AS rubro,
-            TRIM(CAST(central_mayorista AS VARCHAR))        AS central_mayorista,
+            CASE
+                WHEN LOWER(TRIM(CAST(central_mayorista AS VARCHAR))) IN
+                     ('pereira, la 41', 'pereira, la 41-impala')
+                    THEN 'Pereira, La 41'
+                WHEN LOWER(TRIM(CAST(central_mayorista AS VARCHAR))) IN
+                     ('cali, santa elena', 'cali, santa helena')
+                    THEN 'Cali, Santa Elena'
+                ELSE TRIM(CAST(central_mayorista AS VARCHAR))
+            END                                             AS central_mayorista,
             CAST(lon_central AS DOUBLE)                     AS lon_central,
             CAST(lat_central AS DOUBLE)                     AS lat_central,
             UPPER(TRIM(CAST(departamento_origen AS VARCHAR))) AS departamento_origen,
@@ -446,7 +454,15 @@ def get_con_precios(mtime):
             TRIM(CAST(grupo AS VARCHAR))                    AS grupo,
             TRIM(CAST(rubro AS VARCHAR))                    AS rubro,
             TRIM(CAST(producto AS VARCHAR))                 AS producto,
-            TRIM(CAST(central_mayorista AS VARCHAR))        AS central_mayorista,
+            CASE
+                WHEN LOWER(TRIM(CAST(central_mayorista AS VARCHAR))) IN
+                     ('pereira, la 41', 'pereira, la 41-impala')
+                    THEN 'Pereira, La 41'
+                WHEN LOWER(TRIM(CAST(central_mayorista AS VARCHAR))) IN
+                     ('cali, santa elena', 'cali, santa helena')
+                    THEN 'Cali, Santa Elena'
+                ELSE TRIM(CAST(central_mayorista AS VARCHAR))
+            END                                             AS central_mayorista,
             CAST(precio AS DOUBLE)                          AS precio
         FROM read_parquet('{RUTA_PRECIOS_SQL}')
         WHERE precio IS NOT NULL AND precio > 0
@@ -489,7 +505,15 @@ def get_con_intl(mtime):
                 STRFTIME(CAST(fecha_mes AS DATE),'%Y-%m')       AS etiqueta_mes,
                 TRIM(CAST(grupo AS VARCHAR))                    AS grupo,
                 TRIM(CAST(rubro AS VARCHAR))                    AS rubro,
-                TRIM(CAST(central_mayorista AS VARCHAR))        AS central_mayorista,
+                CASE
+                WHEN LOWER(TRIM(CAST(central_mayorista AS VARCHAR))) IN
+                     ('pereira, la 41', 'pereira, la 41-impala')
+                    THEN 'Pereira, La 41'
+                WHEN LOWER(TRIM(CAST(central_mayorista AS VARCHAR))) IN
+                     ('cali, santa elena', 'cali, santa helena')
+                    THEN 'Cali, Santa Elena'
+                ELSE TRIM(CAST(central_mayorista AS VARCHAR))
+            END                                             AS central_mayorista,
                 UPPER(TRIM(CAST(pais_origen AS VARCHAR)))       AS pais_origen,
                 CAST(lon_orig AS DOUBLE)                        AS lon_orig,
                 CAST(lat_orig AS DOUBLE)                        AS lat_orig,
@@ -1654,10 +1678,22 @@ with st.container():
                 </div>""", unsafe_allow_html=True)
 
             vol_intl = intl_df["toneladas_total"].sum() if not intl_df.empty else 0
-            # Centrales activas: si solo internacional, contar centrales de destino intl
-            cent_act_display = cent_act
-            if cent_act == 0 and not intl_df.empty:
-                cent_act_display = intl_df["central_mayorista"].nunique()
+
+            # Centrales activas bajo los filtros actuales.
+            # Se calcula como la UNION de centrales presentes en los flujos nacionales
+            # e internacionales ya filtrados. Así Colombia + países extranjeros no
+            # subestima el indicador y una misma central se cuenta una sola vez.
+            centrales_activas_set = set()
+            if not sankey_df.empty and "central_mayorista" in sankey_df.columns:
+                centrales_activas_set.update(
+                    sankey_df["central_mayorista"].dropna().astype(str).str.strip().tolist()
+                )
+            if not intl_raw.empty and "central_mayorista" in intl_raw.columns:
+                centrales_activas_set.update(
+                    intl_raw["central_mayorista"].dropna().astype(str).str.strip().tolist()
+                )
+            cent_act_display = len(centrales_activas_set)
+
             # Municipios origen: si solo internacional, contar países de origen
             mun_act_display = mun_act
             if mun_act == 0 and not intl_df.empty:
