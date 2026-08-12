@@ -2349,103 +2349,62 @@ with tab_minorista:
             n_meses_filtro = est_mes["mes_reporte"].nunique() if not est_mes.empty else 0
             n_tipos_filtro = fmin["clasificacion_comercio"].nunique() if not fmin.empty else 0
 
-            sem_col, map_col = st.columns([0.92, 2.15], gap="medium")
+            # ── Mapa de precios minoristas a ancho completo ────────────
+            st.markdown('<div class="panel-title">Mapa de precios minoristas por establecimiento</div>', unsafe_allow_html=True)
 
-            # ── Semáforo por establecimiento ───────────────────────────
-            with sem_col:
-                st.markdown('<div class="panel-title">Semáforo por establecimiento</div>', unsafe_allow_html=True)
-                st.caption("Precio mediano del establecimiento · ordenado de mayor a menor")
+            # Widgets compactos de cobertura: quedan en la franja superior del mapa,
+            # sin superponerse a la cartografía.
+            st.markdown(
+                f'''<div class="min-map-toolbar">
+                    <div class="min-map-chip"><div class="min-map-chip-label">Establecimientos filtro</div><div class="min-map-chip-value">{n_est:,}</div></div>
+                    <div class="min-map-chip"><div class="min-map-chip-label">Visibles en mapa</div><div class="min-map-chip-value">{n_geo:,}</div></div>
+                    <div class="min-map-chip"><div class="min-map-chip-label">Cobertura geográfica</div><div class="min-map-chip-value">{cobertura_geo:.1f}%</div></div>
+                    <div class="min-map-chip"><div class="min-map-chip-label">Meses · tipos</div><div class="min-map-chip-value">{n_meses_filtro} · {n_tipos_filtro}</div></div>
+                </div>''',
+                unsafe_allow_html=True,
+            )
 
-                if puntos_mapa.empty:
-                    st.info("No hay establecimientos con coordenadas válidas bajo los filtros actuales.")
-                else:
-                    sem = puntos_mapa.sort_values(["precio", "establecimiento"], ascending=[False, True]).copy()
-                    rows_html = []
-                    for _, r in sem.iterrows():
-                        nombre = html.escape(str(r.get("establecimiento") or "Sin nombre"))
-                        comercio = html.escape(str(r.get("clasificacion_comercio") or "Sin clasificación"))
-                        nivel = html.escape(str(r.get("nivel_precio") or ""))
-                        precio_txt = html.escape(str(r.get("precio_fmt") or "—"))
-                        color_hex = r.get("color_hex", "#8FA0B7")
-                        fondo = r.get("fondo_nivel", "rgba(143,160,183,0.08)")
-                        rows_html.append(
-                            f'''<div class="min-semaforo-row" style="background:{fondo};border-left:3px solid {color_hex};">
-                                <span class="min-semaforo-dot" style="background:{color_hex};"></span>
-                                <div style="min-width:0;">
-                                    <div class="min-semaforo-name" title="{nombre}">{nombre}</div>
-                                    <div class="min-semaforo-sub" title="{comercio}">{comercio} · {nivel}</div>
-                                </div>
-                                <div class="min-semaforo-price">{precio_txt}</div>
-                            </div>'''
-                        )
-
-                    st.markdown(
-                        f'''<div class="min-semaforo-wrap">
-                            <div class="min-semaforo-head">
-                                <div style="color:#8FA0B7;font-size:0.67rem;">{len(sem):,} establecimientos visibles</div>
-                            </div>
-                            {''.join(rows_html)}
-                        </div>''',
-                        unsafe_allow_html=True,
-                    )
-
-            # ── Mapa ───────────────────────────────────────────────────
-            with map_col:
-                st.markdown('<div class="panel-title">Mapa de precios minoristas por establecimiento</div>', unsafe_allow_html=True)
-
-                # Widgets compactos de cobertura: quedan en la franja superior del mapa,
-                # sin superponerse a la cartografía.
-                st.markdown(
-                    f'''<div class="min-map-toolbar">
-                        <div class="min-map-chip"><div class="min-map-chip-label">Establecimientos filtro</div><div class="min-map-chip-value">{n_est:,}</div></div>
-                        <div class="min-map-chip"><div class="min-map-chip-label">Visibles en mapa</div><div class="min-map-chip-value">{n_geo:,}</div></div>
-                        <div class="min-map-chip"><div class="min-map-chip-label">Cobertura geográfica</div><div class="min-map-chip-value">{cobertura_geo:.1f}%</div></div>
-                        <div class="min-map-chip"><div class="min-map-chip-label">Meses · tipos</div><div class="min-map-chip-value">{n_meses_filtro} · {n_tipos_filtro}</div></div>
-                    </div>''',
-                    unsafe_allow_html=True,
+            if not puntos_mapa.empty:
+                layer = pdk.Layer(
+                    "ScatterplotLayer",
+                    data=puntos_mapa,
+                    get_position="[longitud, latitud]",
+                    get_fill_color="color",
+                    get_radius=85,
+                    radius_min_pixels=5,
+                    radius_max_pixels=12,
+                    pickable=True,
+                    stroked=True,
+                    get_line_color=[235, 240, 248, 180],
+                    line_width_min_pixels=1,
                 )
+                view = pdk.ViewState(latitude=4.65, longitude=-74.10, zoom=10.4, pitch=0)
+                tooltip = {
+                    "html": (
+                        "<b>{establecimiento}</b><br/>"
+                        "Precio mediano: <b>{precio_fmt}</b><br/>"
+                        "Rango observado: {rango_fmt}<br/>"
+                        "Nivel: {nivel_precio}<br/>"
+                        "Comercio: {clasificacion_comercio}<br/>"
+                        "Dirección: {direccion}<br/>"
+                        "Meses observados: {meses}"
+                    ),
+                    "style": {"backgroundColor": "#111827", "color": "#F3F4F6"},
+                }
+                st.pydeck_chart(
+                    pdk.Deck(
+                        layers=[layer],
+                        initial_view_state=view,
+                        tooltip=tooltip,
+                        map_style="dark",
+                    ),
+                    use_container_width=True,
+                    height=680,
+                )
+            else:
+                st.info("No hay establecimientos con coordenadas válidas bajo los filtros actuales.")
 
-                if not puntos_mapa.empty:
-                    layer = pdk.Layer(
-                        "ScatterplotLayer",
-                        data=puntos_mapa,
-                        get_position="[longitud, latitud]",
-                        get_fill_color="color",
-                        get_radius=85,
-                        radius_min_pixels=5,
-                        radius_max_pixels=12,
-                        pickable=True,
-                        stroked=True,
-                        get_line_color=[235, 240, 248, 180],
-                        line_width_min_pixels=1,
-                    )
-                    view = pdk.ViewState(latitude=4.65, longitude=-74.10, zoom=10.4, pitch=0)
-                    tooltip = {
-                        "html": (
-                            "<b>{establecimiento}</b><br/>"
-                            "Precio mediano: <b>{precio_fmt}</b><br/>"
-                            "Rango observado: {rango_fmt}<br/>"
-                            "Nivel: {nivel_precio}<br/>"
-                            "Comercio: {clasificacion_comercio}<br/>"
-                            "Dirección: {direccion}<br/>"
-                            "Meses observados: {meses}"
-                        ),
-                        "style": {"backgroundColor": "#111827", "color": "#F3F4F6"},
-                    }
-                    st.pydeck_chart(
-                        pdk.Deck(
-                            layers=[layer],
-                            initial_view_state=view,
-                            tooltip=tooltip,
-                            map_style="dark",
-                        ),
-                        use_container_width=True,
-                        height=650,
-                    )
-                else:
-                    st.info("No hay establecimientos con coordenadas válidas bajo los filtros actuales.")
-
-            # Lectura del mapa compacta, debajo del semáforo y del mapa.
+            # Lectura del mapa compacta, debajo del mapa.
             q33_txt = formatear_cop(q33) if pd.notna(q33) else "—"
             q67_txt = formatear_cop(q67) if pd.notna(q67) else "—"
             st.markdown(
