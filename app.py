@@ -25,17 +25,15 @@ BASE_DIR         = Path("Datos")
 RUTA_LINEAS      = BASE_DIR / "lineas_abastecimiento.parquet"
 RUTA_MUNICIPIOS  = BASE_DIR / "municipios_ligeros.parquet"
 RUTA_PRECIOS     = BASE_DIR / "precios_rubros.parquet"
-RUTA_VARIEDADES       = BASE_DIR / "lineas_variedades.parquet"
 RUTA_INTERNACIONALES  = BASE_DIR / "lineas_internacionales.parquet"
 RUTA_LOGO             = BASE_DIR / "MDS-245-ES.jpg"
 RUTA_LINEAS_SQL       = RUTA_LINEAS.as_posix()
 RUTA_PRECIOS_SQL      = RUTA_PRECIOS.as_posix()
-RUTA_VAR_SQL          = RUTA_VARIEDADES.as_posix()
 RUTA_INTL_SQL         = RUTA_INTERNACIONALES.as_posix()
 
 DEPTOS_RAPE = {
     "BOGOTÁ", "BOGOTÁ, D.C.", "BOGOTA", "BOGOTA D.C.", "BOGOTÁ D.C.",
-    "CUNDINAMARCA", "META", "BOYACÁ", "BOYACA", "TOLIMA"
+    "CUNDINAMARCA", "META", "BOYACÁ", "BOYACA", "TOLIMA", "HUILA"
 }
 
 MAX_FILAS_TABLA = 300
@@ -83,53 +81,112 @@ RUBROS_PRIORIZADOS_SARA = {
     "Carne_res","Pescado","Huevos","Leche","Quesos_cuajadas","Panela"
 }
 
-# ── Municipios priorizados SARA ────────────────────────────
-MUNS_OFERTA = {
-    '11001','15001','15047','15238','15407','15638','15646','15696',
-    '15759','15763','15814','25151','25178','25181','25183','25214',
-    '25260','25269','25279','25286','25290','25312','25322','25377',
-    '25386','25430','25473','25535','25649','25743','25754','25769',
-    '25793','25817','25843','25845','25873','25899','41001','41298',
-    '41551','50001','50251','50287','50313','50400','50568','50573',
-    '50590','50689','73001','73124','73268','73443'
-}
-MUNS_DEMANDA = {
-    '11001','25126','25151','25175','25183','25269','25286','25290',
-    '25297','25307','25320','25377','25386','25430','25438','25473',
-    '25513','25662','25754','25843','25875','25899'
-}
-MUNS_AMBOS = MUNS_OFERTA & MUNS_DEMANDA
+# ── Clasificaciones territoriales SARA ─────────────────────
+# Fuente: Municipios_Nacional_Base_Completa.xlsx (hoja "Municipios").
+# Se mantienen las categorías exactamente como aparecen en la base suministrada.
 
-# ── Territorios funcionales (fuente: Municipios_RAPE.xlsx) ─
-TERRITORIOS_FUNC = {
-    "Bogotá, D.C.":     ['11001'],
-    "Noroccidental":    ['25148','25214','25260','25320','25394','25398','25402',
-                         '25489','25491','25572','25592','25658','25769','25777',
-                         '25799','25851','25862','25875','25885'],
-    "Norte":            ['25126','25154','25175','25183','25200','25224','25258',
-                         '25288','25295','25317','25407','25426','25436','25486',
-                         '25513','25518','25653','25736','25745','25758','25772',
-                         '25779','25781','25785','25793','25807','25817','25823',
-                         '25843','25871','25873','25899'],
-    "Occidental":       ['25019','25040','25086','25095','25099','25123','25168',
-                         '25269','25286','25328','25430','25473','25580','25596',
-                         '25662','25718','25867','25898'],
-    "Oriente - Llanos": ['25151','25178','25281','25335','25339','25438','25530',
-                         '25594','25845'],
-    "Oriente Guavio":   ['25181','25279','25293','25297','25299','25322','25326',
-                         '25372','25377','25839','25841'],
-    "Suroccidental":    ['25001','25035','25053','25120','25245','25290','25307',
-                         '25312','25324','25368','25386','25483','25488','25506',
-                         '25524','25535','25599','25612','25645','25649','25740',
-                         '25743','25754','25797','25805','25815','25878'],
-}
-
-# ── Región Central y Metropolitana ────────────────────────
 DEPTOS_REGION_CENTRAL = {
     'BOYACÁ','BOYACA','CUNDINAMARCA','HUILA','META','TOLIMA',
     'BOGOTÁ','BOGOTÁ, D.C.','BOGOTA','BOGOTA D.C.','BOGOTÁ D.C.'
 }
-MUNS_REGION_METROPOLITANA = {'11001','25754','25290'}  # Bogotá, Soacha, Fusagasugá
+DEPTOS_REGION_CENTRAL_EXTERNA = {'BOYACÁ','BOYACA','HUILA','META','TOLIMA'}
+DEPTOS_RMBC = {
+    'CUNDINAMARCA','BOGOTÁ','BOGOTÁ, D.C.','BOGOTA','BOGOTA D.C.','BOGOTÁ D.C.'
+}
+
+TERRITORIOS_FUNC = {
+    'Bogotá, D.C.': {
+        '11001',
+},
+    'Noroccidental': {
+        '25148', '25214', '25260', '25320', '25394', '25398', '25402', '25489',
+        '25491', '25572', '25592', '25658', '25769', '25777', '25799', '25851',
+        '25862', '25875', '25885',
+},
+    'Norte': {
+        '25126', '25154', '25175', '25183', '25200', '25224', '25258', '25288',
+        '25295', '25317', '25407', '25426', '25436', '25486', '25513', '25518',
+        '25653', '25736', '25745', '25758', '25772', '25779', '25781', '25785',
+        '25793', '25807', '25817', '25823', '25843', '25871', '25873', '25899',
+},
+    'Occidental': {
+        '25019', '25040', '25086', '25095', '25099', '25123', '25168', '25269',
+        '25286', '25328', '25430', '25473', '25580', '25596', '25662', '25718',
+        '25867', '25898',
+},
+    'Oriente - Llanos': {
+        '25151', '25178', '25281', '25335', '25339', '25438', '25530', '25594',
+        '25845',
+},
+    'Oriente Guavio': {
+        '25181', '25279', '25293', '25297', '25299', '25322', '25326', '25372',
+        '25377', '25839', '25841',
+},
+    'Suroccidental': {
+        '25001', '25035', '25053', '25120', '25245', '25290', '25307', '25312',
+        '25324', '25368', '25386', '25483', '25488', '25506', '25524', '25535',
+        '25599', '25612', '25645', '25649', '25740', '25743', '25754', '25797',
+        '25805', '25815', '25878',
+},
+}
+
+MUNS_PRIORI_ROL = {
+    'Oferta': {
+        '15001', '15047', '15238', '15407', '15638', '15646', '15696', '15759',
+        '15763', '15814', '25178', '25181', '25214', '25260', '25279', '25312',
+        '25322', '25535', '25649', '25743', '25769', '25793', '25817', '25845',
+        '25873', '41001', '41298', '41551', '50001', '50251', '50287', '50313',
+        '50400', '50568', '50573', '50590', '50689', '73001', '73124', '73268',
+        '73443',
+},
+    'Demanda': {
+        '25126', '25175', '25297', '25307', '25320', '25438', '25513', '25662',
+        '25875',
+},
+    'Oferta y demanda': {
+        '11001', '25151', '25183', '25269', '25286', '25290', '25377', '25386',
+        '25430', '25473', '25754', '25843', '25899',
+},
+}
+
+MUNS_MUESTRA_178 = {
+    '11001', '15001', '15238', '15407', '15646', '15759', '25126', '25151',
+    '25175', '25178', '25181', '25183', '25214', '25260', '25269', '25279',
+    '25286', '25290', '25297', '25307', '25312', '25320', '25322', '25377',
+    '25386', '25430', '25438', '25473', '25513', '25535', '25649', '25662',
+    '25740', '25743', '25754', '25769', '25793', '25815', '25843', '25845',
+    '25873', '25875', '25899', '41001', '50001', '50313', '50568', '73001',
+    '73268', '73443',
+}
+
+MUNS_CONMUTADOS = {
+    '25126', '25175', '25214', '25269', '25286', '25377', '25430', '25473',
+    '25754', '25899',
+}
+
+MUNS_REGION_METROPOLITANA = {
+    '11001', '25001', '25019', '25035', '25040', '25053', '25086', '25095',
+    '25099', '25120', '25123', '25126', '25148', '25151', '25154', '25168',
+    '25175', '25178', '25181', '25183', '25200', '25214', '25224', '25245',
+    '25258', '25260', '25269', '25279', '25281', '25286', '25288', '25290',
+    '25293', '25295', '25297', '25299', '25307', '25312', '25317', '25320',
+    '25322', '25324', '25326', '25328', '25335', '25339', '25368', '25372',
+    '25377', '25386', '25394', '25398', '25402', '25407', '25426', '25430',
+    '25436', '25438', '25473', '25483', '25486', '25488', '25489', '25491',
+    '25506', '25513', '25518', '25524', '25530', '25535', '25572', '25580',
+    '25592', '25594', '25596', '25599', '25612', '25645', '25649', '25653',
+    '25658', '25662', '25718', '25736', '25740', '25743', '25745', '25754',
+    '25758', '25769', '25772', '25777', '25779', '25781', '25785', '25793',
+    '25797', '25799', '25805', '25807', '25815', '25817', '25823', '25839',
+    '25841', '25843', '25845', '25851', '25862', '25867', '25871', '25873',
+    '25875', '25878', '25885', '25898', '25899',
+}
+
+# Compatibilidad con la lógica histórica:
+# "Oferta" incluye los municipios de rol mixto; "Demanda" también.
+MUNS_AMBOS = set(MUNS_PRIORI_ROL["Oferta y demanda"])
+MUNS_OFERTA = set(MUNS_PRIORI_ROL["Oferta"]) | MUNS_AMBOS
+MUNS_DEMANDA = set(MUNS_PRIORI_ROL["Demanda"]) | MUNS_AMBOS
 
 # ── Países de origen internacional ────────────────────────
 PAISES_COORDS = {
@@ -494,7 +551,7 @@ def consultar_paises(mtime_intl):
           AND pais_origen IS NOT NULL
         ORDER BY 1
     """).df()
-    return df["pais_origen"].tolist()
+    return ["COLOMBIA"] + df["pais_origen"].tolist()
 
 # =========================================================
 # WHERE BUILDER
@@ -528,7 +585,14 @@ def build_where_ab(fecha_ini, fecha_fin, semestre, grupo, rubros, centrales, dep
         c.append(f"municipio_origen IN ({','.join(['?']*len(ml))})"); p.extend(ml)
     if muns_prio:
         ml = list(muns_prio)
-        c.append(f"cod_municipio IN ({','.join(['?']*len(ml))})"); p.extend(ml)
+        cod_expr = """CASE
+            WHEN UPPER(municipio_origen)='UNE'     THEN '25845'
+            WHEN UPPER(municipio_origen)='FÓMEQUE' THEN '25279'
+            WHEN UPPER(municipio_origen)='FOMEQUE' THEN '25279'
+            WHEN UPPER(municipio_origen)='CERRITO' THEN '68162'
+            ELSE cod_municipio
+        END"""
+        c.append(f"{cod_expr} IN ({','.join(['?']*len(ml))})"); p.extend(ml)
     return " AND ".join(c), p
 
 def build_where_pr(fecha_ini, fecha_fin, semestre, grupo, rubros, centrales):
@@ -638,7 +702,6 @@ def consultar_abast(fecha_ini, fecha_fin, semestre, grupo, rubro,
 # =========================================================
 
 @st.cache_data(show_spinner=False)
-@st.cache_data(show_spinner=False)
 def consultar_precios(fecha_ini, fecha_fin, semestre, grupo, rubro,
                       centrales_t, mtime_pr):
     """Un solo escaneo de precios que devuelve serie mensual y precio por central."""
@@ -669,6 +732,128 @@ def consultar_precios(fecha_ini, fecha_fin, semestre, grupo, rubro,
     return ex("serie"), ex("central")
 
 
+@st.cache_data(show_spinner=False)
+def consultar_precios_por_flujo(
+    fecha_ini, fecha_fin, semestre, grupo, rubros,
+    centrales_t, deptos_t, muns_prio_t, municipios_t,
+    mtime_ab, mtime_pr
+):
+    """
+    Calcula el precio asociado al abastecimiento real:
+    1) agrega toneladas por municipio-central-mes;
+    2) calcula el precio SIPSA por central-mes;
+    3) cruza ambos solo cuando existe flujo;
+    4) pondera el precio por las toneladas efectivamente enviadas.
+
+    Devuelve precio por municipio, precio por flujo OD, serie mensual ponderada
+    y el precio general ponderado.
+    """
+    if len(rubros) != 1:
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), None
+
+    ca = get_con_abast(mtime_ab)
+    wa, pa = build_where_ab(
+        fecha_ini, fecha_fin, semestre, grupo, rubros,
+        centrales_t, deptos_t,
+        set(muns_prio_t) if muns_prio_t else None,
+        set(municipios_t) if municipios_t else None
+    )
+
+    cod_expr = """CASE
+        WHEN UPPER(municipio_origen)='UNE'     THEN '25845'
+        WHEN UPPER(municipio_origen)='FÓMEQUE' THEN '25279'
+        WHEN UPPER(municipio_origen)='FOMEQUE' THEN '25279'
+        WHEN UPPER(municipio_origen)='CERRITO' THEN '68162'
+        ELSE cod_municipio
+    END"""
+
+    flujos_mes = ca.execute(f"""
+        SELECT
+            etiqueta_mes,
+            {cod_expr} AS cod_municipio,
+            central_mayorista,
+            SUM(toneladas) AS toneladas_total
+        FROM lineas
+        WHERE {wa}
+        GROUP BY 1,2,3
+    """, pa).df()
+
+    if flujos_mes.empty:
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), None
+
+    cp = get_con_precios(mtime_pr)
+    wp, pp = build_where_pr(
+        fecha_ini, fecha_fin, semestre, grupo, rubros, centrales_t
+    )
+    precios_mes = cp.execute(f"""
+        SELECT
+            etiqueta_mes,
+            central_mayorista,
+            AVG(precio) AS precio_central_mes
+        FROM precios
+        WHERE {wp}
+        GROUP BY 1,2
+    """, pp).df()
+
+    if precios_mes.empty:
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), None
+
+    cruce = flujos_mes.merge(
+        precios_mes,
+        on=["etiqueta_mes","central_mayorista"],
+        how="left"
+    )
+    cruce = cruce[
+        cruce["precio_central_mes"].notna()
+        & cruce["toneladas_total"].notna()
+        & (cruce["toneladas_total"] > 0)
+    ].copy()
+
+    if cruce.empty:
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), None
+
+    cruce["valor_precio"] = cruce["precio_central_mes"] * cruce["toneladas_total"]
+
+    pm = (
+        cruce.groupby("cod_municipio", as_index=False)
+        .agg(
+            valor_precio=("valor_precio","sum"),
+            toneladas_con_precio=("toneladas_total","sum")
+        )
+    )
+    pm["precio_municipio"] = pm["valor_precio"] / pm["toneladas_con_precio"]
+    pm = pm[["cod_municipio","precio_municipio","toneladas_con_precio"]]
+
+    pf = (
+        cruce.groupby(["cod_municipio","central_mayorista"], as_index=False)
+        .agg(
+            valor_precio=("valor_precio","sum"),
+            toneladas_con_precio=("toneladas_total","sum")
+        )
+    )
+    pf["precio_flujo"] = pf["valor_precio"] / pf["toneladas_con_precio"]
+    pf = pf[["cod_municipio","central_mayorista","precio_flujo"]]
+
+    serie = (
+        cruce.groupby("etiqueta_mes", as_index=False)
+        .agg(
+            valor_precio=("valor_precio","sum"),
+            toneladas_con_precio=("toneladas_total","sum")
+        )
+        .sort_values("etiqueta_mes")
+    )
+    serie["precio_promedio"] = serie["valor_precio"] / serie["toneladas_con_precio"]
+    serie = serie[["etiqueta_mes","precio_promedio","toneladas_con_precio"]]
+
+    toneladas_precio = cruce["toneladas_total"].sum()
+    precio_general = (
+        cruce["valor_precio"].sum() / toneladas_precio
+        if toneladas_precio > 0 else None
+    )
+
+    return pm, pf, serie, precio_general
+
+
 # =========================================================
 # CARGA INICIAL
 # =========================================================
@@ -677,149 +862,10 @@ mtime_ab   = obtener_mtime(RUTA_LINEAS)
 mtime_pr   = obtener_mtime(RUTA_PRECIOS)
 mtime_mun  = obtener_mtime(RUTA_MUNICIPIOS)
 mtime_intl = obtener_mtime(RUTA_INTERNACIONALES)
-mtime_var  = obtener_mtime(RUTA_VARIEDADES)
-
-@st.cache_resource(show_spinner=False)
-def get_con_var(mtime):
-    con = duckdb.connect(database=":memory:")
-    con.execute("PRAGMA threads=4")
-    if RUTA_VARIEDADES.exists():
-        con.execute(f"""
-            CREATE OR REPLACE VIEW variedades AS
-            SELECT
-                CAST(fecha_mes AS DATE)                        AS fecha_mes,
-                MONTH(CAST(fecha_mes AS DATE))                 AS mes,
-                CASE WHEN MONTH(CAST(fecha_mes AS DATE)) BETWEEN 1 AND 6
-                     THEN 'Primer semestre' ELSE 'Segundo semestre' END AS semestre,
-                STRFTIME(CAST(fecha_mes AS DATE),'%Y-%m')      AS etiqueta_mes,
-                TRIM(CAST(rubro AS VARCHAR))                   AS rubro,
-                TRIM(CAST(alimento AS VARCHAR))                AS alimento,
-                TRIM(CAST(central_mayorista AS VARCHAR))       AS central_mayorista,
-                UPPER(TRIM(CAST(departamento_origen AS VARCHAR))) AS departamento_origen,
-                UPPER(TRIM(CAST(municipio_origen AS VARCHAR))) AS municipio_origen,
-                TRIM(CAST(cod_municipio AS VARCHAR))           AS cod_municipio,
-                CAST(lon_mun AS DOUBLE)                        AS lon_mun,
-                CAST(lat_mun AS DOUBLE)                        AS lat_mun,
-                CAST(lon_central AS DOUBLE)                    AS lon_central,
-                CAST(lat_central AS DOUBLE)                    AS lat_central,
-                CAST(toneladas AS DOUBLE)                      AS toneladas,
-                CAST(precio AS DOUBLE)                         AS precio,
-                CAST(tipo_precio AS VARCHAR)                   AS tipo_precio,
-                CAST(unidad_precio AS VARCHAR)                 AS unidad_precio,
-                CAST(nota_precio AS VARCHAR)                   AS nota_precio
-            FROM read_parquet('{RUTA_VAR_SQL}')
-        """)
-    return con
-
-@st.cache_data(show_spinner=False)
-def consultar_var_catalogos(mtime_var):
-    """Catálogos para la pestaña de variedades."""
-    if not RUTA_VARIEDADES.exists():
-        return {}, [], []
-    con = get_con_var(mtime_var)
-    # Rubros priorizados disponibles en el parquet
-    rubros_var = con.execute(
-        "SELECT DISTINCT rubro FROM variedades WHERE rubro IS NOT NULL ORDER BY rubro"
-    ).df()["rubro"].tolist()
-    # Alimentos por rubro
-    alimentos_df = con.execute(
-        "SELECT DISTINCT rubro, alimento FROM variedades WHERE alimento IS NOT NULL ORDER BY rubro, alimento"
-    ).df()
-    alimentos_por_rubro = alimentos_df.groupby("rubro")["alimento"].apply(list).to_dict()
-    # Centrales
-    centrales_var = con.execute(
-        "SELECT DISTINCT central_mayorista FROM variedades WHERE central_mayorista IS NOT NULL ORDER BY central_mayorista"
-    ).df()["central_mayorista"].tolist()
-    rango_var = con.execute(
-        "SELECT MIN(fecha_mes) AS fmin, MAX(fecha_mes) AS fmax FROM variedades"
-    ).df()
-    fecha_min_var = pd.to_datetime(rango_var.loc[0,"fmin"]).date()
-    fecha_max_var = pd.to_datetime(rango_var.loc[0,"fmax"]).date()
-    return alimentos_por_rubro, centrales_var, (fecha_min_var, fecha_max_var)
-
-@st.cache_data(show_spinner=False)
-def consultar_var(fecha_ini, fecha_fin, semestre, rubros_t, alimentos_t,
-                  centrales_t, deptos_t, municipios_t, muns_prio_t, mtime_var):
-    """Consulta principal de variedades con todos los filtros."""
-    if not RUTA_VARIEDADES.exists():
-        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
-    con = get_con_var(mtime_var)
-
-    c = ["fecha_mes BETWEEN ? AND ?"]
-    p = [fecha_ini.isoformat(), fecha_fin.isoformat()]
-    if semestre == "Primer semestre":    c.append("mes BETWEEN 1 AND 6")
-    elif semestre == "Segundo semestre": c.append("mes BETWEEN 7 AND 12")
-    if rubros_t:
-        c.append(f"rubro IN ({','.join(['?']*len(rubros_t))})"); p.extend(list(rubros_t))
-    if alimentos_t:
-        c.append(f"alimento IN ({','.join(['?']*len(alimentos_t))})"); p.extend(list(alimentos_t))
-    if centrales_t:
-        c.append(f"central_mayorista IN ({','.join(['?']*len(centrales_t))})"); p.extend(list(centrales_t))
-    if deptos_t:
-        c.append(f"departamento_origen IN ({','.join(['?']*len(deptos_t))})"); p.extend(list(deptos_t))
-    if municipios_t:
-        c.append(f"municipio_origen IN ({','.join(['?']*len(municipios_t))})"); p.extend(list(municipios_t))
-    if muns_prio_t:
-        c.append(f"cod_municipio IN ({','.join(['?']*len(muns_prio_t))})"); p.extend(list(muns_prio_t))
-    w = " AND ".join(c)
-
-    # WHERE solo rubro para referencia (sin alimento ni geo)
-    c_ref = ["fecha_mes BETWEEN ? AND ?"]
-    p_ref = [fecha_ini.isoformat(), fecha_fin.isoformat()]
-    if semestre == "Primer semestre":    c_ref.append("mes BETWEEN 1 AND 6")
-    elif semestre == "Segundo semestre": c_ref.append("mes BETWEEN 7 AND 12")
-    if rubros_t:
-        c_ref.append(f"rubro IN ({','.join(['?']*len(rubros_t))})"); p_ref.extend(list(rubros_t))
-    if centrales_t:
-        c_ref.append(f"central_mayorista IN ({','.join(['?']*len(centrales_t))})"); p_ref.extend(list(centrales_t))
-    w_ref = " AND ".join(c_ref)
-
-    try:
-        rubro_ref = con.execute(f"""
-            SELECT rubro,
-                   SUM(toneladas) AS ton_rubro,
-                   AVG(CASE WHEN precio IS NOT NULL THEN precio END) AS precio_prom_rubro
-            FROM variedades WHERE {w_ref}
-            GROUP BY rubro
-        """, p_ref).df()
-
-        flujos = con.execute(f"""
-            SELECT alimento, rubro, municipio_origen, departamento_origen, cod_municipio,
-                   central_mayorista,
-                   AVG(lon_mun) AS lon_orig, AVG(lat_mun) AS lat_orig,
-                   AVG(lon_central) AS lon_dest, AVG(lat_central) AS lat_dest,
-                   SUM(toneladas) AS toneladas_total,
-                   AVG(CASE WHEN precio IS NOT NULL THEN precio END) AS precio_prom
-            FROM variedades WHERE {w}
-              AND lon_mun IS NOT NULL AND lon_central IS NOT NULL
-            GROUP BY 1,2,3,4,5,6 ORDER BY toneladas_total DESC
-        """, p).df()
-
-        serie = con.execute(f"""
-            SELECT etiqueta_mes, alimento, rubro,
-                   SUM(toneladas) AS toneladas_total,
-                   AVG(CASE WHEN precio IS NOT NULL THEN precio END) AS precio_prom
-            FROM variedades WHERE {w}
-            GROUP BY 1,2,3 ORDER BY 1,2
-        """, p).df()
-
-        tabla = con.execute(f"""
-            SELECT municipio_origen, departamento_origen, alimento, rubro,
-                   SUM(toneladas) AS toneladas_total,
-                   COUNT(DISTINCT etiqueta_mes) AS meses_activos,
-                   AVG(CASE WHEN precio IS NOT NULL THEN precio END) AS precio_prom
-            FROM variedades WHERE {w}
-            GROUP BY 1,2,3,4 ORDER BY toneladas_total DESC
-        """, p).df()
-
-    except Exception:
-        flujos = serie = tabla = rubro_ref = pd.DataFrame()
-    return flujos, serie, tabla, rubro_ref
 
 municipios = cargar_municipios(mtime_mun)
 grupos, rubros, centrales, deptos, municipios_df, fecha_min_g, fecha_max_g = consultar_catalogos(mtime_ab, mtime_pr)
 paises_lista = consultar_paises(mtime_intl)
-alimentos_por_rubro, centrales_var, rango_var = consultar_var_catalogos(mtime_var)
 
 # =========================================================
 # ENCABEZADO
@@ -845,19 +891,62 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-tab1, tab2 = st.tabs(["Abastecimiento por rubro", "Desglose por variedad (Priorizados SARA)"])
+with st.container():
 
-with tab1:
+    # ── Estado de filtros SARA (fuente: base territorial suministrada) ──
+    solo_priorizados = st.session_state.get("_cb_solo_prio", False)
+    sara_region_sel  = st.session_state.get("sara_region", "Sin filtro territorial")
+    sara_roles_sel   = st.session_state.get("sara_roles", [])
+    sara_muestra     = st.session_state.get("sara_muestra", False)
+    sara_conmutados  = st.session_state.get("sara_conmutados", False)
+    territorio_sel   = st.session_state.get("sara_territorios", [])
 
-    # Leer valores SARA desde session_state ANTES de renderizar filtros
-    # Los widgets del expander SARA se definen después pero persisten via session_state
-    solo_priorizados        = st.session_state.get("_cb_solo_prio", False)
-    prio_oferta             = st.session_state.get("prio_oferta",   False)
-    prio_demanda            = st.session_state.get("prio_demanda",  False)
-    prio_region_central     = st.session_state.get("prio_rc",       False)
-    prio_region_metropolitana = st.session_state.get("prio_rm",     False)
-    territorio_sel          = [t for t in sorted(TERRITORIOS_FUNC.keys())
-                               if st.session_state.get(f"terr_{t}", False)]
+    def _codigos_por_deptos(deptos_objetivo):
+        if not deptos_objetivo or "cod_municipio" not in municipios_df.columns:
+            return set()
+        mask = municipios_df["departamento_origen"].fillna("").str.upper().isin(
+            {str(d).upper() for d in deptos_objetivo}
+        )
+        return set(
+            municipios_df.loc[mask, "cod_municipio"]
+            .apply(normalizar_codigo_5).dropna().astype(str).tolist()
+        )
+
+    def _interseccion_sara(region_sel, roles_sel, muestra_sel, conmutados_sel, territorios_sel):
+        conjuntos = []
+        if region_sel == "Región Central completa":
+            conjuntos.append(_codigos_por_deptos(DEPTOS_REGION_CENTRAL))
+        elif region_sel == "Región Central externa":
+            conjuntos.append(_codigos_por_deptos(DEPTOS_REGION_CENTRAL_EXTERNA))
+        elif region_sel == "Región Metropolitana Bogotá-Cundinamarca":
+            conjuntos.append(set(MUNS_REGION_METROPOLITANA))
+
+        if roles_sel:
+            rol_union = set()
+            for rol in roles_sel:
+                rol_union.update(MUNS_PRIORI_ROL.get(rol, set()))
+            conjuntos.append(rol_union)
+
+        if muestra_sel:
+            conjuntos.append(set(MUNS_MUESTRA_178))
+        if conmutados_sel:
+            conjuntos.append(set(MUNS_CONMUTADOS))
+        if territorios_sel:
+            terr_union = set()
+            for t in territorios_sel:
+                terr_union.update(TERRITORIOS_FUNC.get(t, set()))
+            conjuntos.append(terr_union)
+
+        if not conjuntos:
+            return None
+        resultado = set(conjuntos[0])
+        for conjunto in conjuntos[1:]:
+            resultado &= set(conjunto)
+        return resultado
+
+    _muns_sara_pre = _interseccion_sara(
+        sara_region_sel, sara_roles_sel, sara_muestra, sara_conmutados, territorio_sel
+    )
 
     st.markdown('<div class="filter-wrap">', unsafe_allow_html=True)
 
@@ -877,181 +966,205 @@ with tab1:
         else:
             rubros_f_codigos = sorted(rubros, key=lambda r: label_rubro(r))
         rubros_f_labels = [label_rubro(r) for r in rubros_f_codigos]
-        rubros_sel_labels = st.multiselect("Rubro", options=rubros_f_labels,
-                                           default=[], placeholder="Todos los rubros")
+        rubros_sel_labels = st.multiselect(
+            "Rubro", options=rubros_f_labels, default=[], placeholder="Todos los rubros"
+        )
         rubros_sel = [codigo_rubro(l) for l in rubros_sel_labels]
     with f3:
         centrales_sel = st.multiselect("Central mayorista", options=centrales, default=[])
     with f4:
         semestre_sel = st.selectbox("Periodo", ["Todos","Primer semestre","Segundo semestre"], index=0)
     with f5:
-        rango = st.date_input("Fechas", value=(fecha_min_g, fecha_max_g),
-                              min_value=fecha_min_g, max_value=fecha_max_g)
+        rango = st.date_input(
+            "Fechas", value=(fecha_min_g, fecha_max_g),
+            min_value=fecha_min_g, max_value=fecha_max_g
+        )
 
     st.markdown('<div style="height:0.4rem;"></div>', unsafe_allow_html=True)
 
     # ── Fila 2: Depto | Municipio | País | Toggle | Slider ───
     g1, g2, g3, g4, g5 = st.columns([1.1, 1.2, 1.2, 0.9, 1.0])
     with g1:
-        # Calcular conjunto de municipios SARA activo para restringir deptos
-        _muns_sara = None
-        if prio_oferta and prio_demanda:   _muns_sara = MUNS_AMBOS
-        elif prio_oferta:                  _muns_sara = MUNS_OFERTA
-        elif prio_demanda:                 _muns_sara = MUNS_DEMANDA
-        if prio_region_metropolitana:
-            _muns_sara = (_muns_sara & MUNS_REGION_METROPOLITANA) if _muns_sara else MUNS_REGION_METROPOLITANA
-        if territorio_sel:
-            _muns_terr_g1 = set()
-            for t in territorio_sel: _muns_terr_g1.update(TERRITORIOS_FUNC.get(t, []))
-            _muns_sara = (_muns_sara & _muns_terr_g1) if _muns_sara else _muns_terr_g1
-        # Restringir deptos disponibles
-        if _muns_sara and "cod_municipio" in municipios_df.columns:
+        deptos_nacionales = [d for d in deptos if d != "INTERNACIONAL"]
+        if _muns_sara_pre is not None and "cod_municipio" in municipios_df.columns:
+            _cod_tmp = municipios_df["cod_municipio"].apply(normalizar_codigo_5).astype(str)
             _deptos_sara = set(
-                municipios_df[municipios_df["cod_municipio"].astype(str).isin(_muns_sara)]["departamento_origen"].str.upper().dropna().tolist()
+                municipios_df.loc[_cod_tmp.isin(_muns_sara_pre), "departamento_origen"]
+                .dropna().astype(str).tolist()
             )
-            deptos_opciones = [d for d in deptos if d.upper() in _deptos_sara or d == "INTERNACIONAL"]
-        elif prio_region_central:
-            deptos_opciones = [d for d in deptos if d.upper() in DEPTOS_REGION_CENTRAL or d == "INTERNACIONAL"]
+            deptos_opciones = [d for d in deptos_nacionales if d in _deptos_sara]
         else:
-            deptos_opciones = deptos
-        deptos_sel = st.multiselect("Depto. origen", deptos_opciones, default=[])
+            deptos_opciones = deptos_nacionales
+        deptos_sel = st.multiselect(
+            "Depto. origen", deptos_opciones, default=[], placeholder="Todos los departamentos"
+        )
+
     with g2:
-        deptos_sin_intl = [d for d in deptos_sel if d != "INTERNACIONAL"]
-        if deptos_sin_intl:
-            muns_base = municipios_df[municipios_df["departamento_origen"].isin(deptos_sin_intl)]["municipio_origen"].unique().tolist()
+        if deptos_sel:
+            muns_base_df = municipios_df[
+                municipios_df["departamento_origen"].isin(deptos_sel)
+            ].copy()
         else:
-            muns_base = municipios_df["municipio_origen"].unique().tolist()
-        # Filtrar municipios por SARA
-        _muns_prio_temp = None
-        if prio_oferta and prio_demanda:   _muns_prio_temp = MUNS_AMBOS
-        elif prio_oferta:                  _muns_prio_temp = MUNS_OFERTA
-        elif prio_demanda:                 _muns_prio_temp = MUNS_DEMANDA
-        if prio_region_metropolitana:
-            _muns_prio_temp = (_muns_prio_temp & MUNS_REGION_METROPOLITANA) if _muns_prio_temp else MUNS_REGION_METROPOLITANA
-        if territorio_sel:
-            _muns_terr = set()
-            for t in territorio_sel: _muns_terr.update(TERRITORIOS_FUNC.get(t, []))
-            _muns_prio_temp = (_muns_prio_temp & _muns_terr) if _muns_prio_temp else _muns_terr
-        if _muns_prio_temp and "cod_municipio" in municipios_df.columns:
-            muns_prio_nombres = set(
-                municipios_df[municipios_df["cod_municipio"].astype(str).isin(_muns_prio_temp)]["municipio_origen"].tolist()
-            )
-            muns_base = [m for m in muns_base if m in muns_prio_nombres] or muns_base
-        muns_opciones = sorted(muns_base)
-        municipios_sel = st.multiselect("Municipio origen", options=muns_opciones,
-                                        default=[], placeholder="Todos los municipios")
+            muns_base_df = municipios_df.copy()
+
+        if _muns_sara_pre is not None and "cod_municipio" in muns_base_df.columns:
+            _cod_m = muns_base_df["cod_municipio"].apply(normalizar_codigo_5).astype(str)
+            muns_base_df = muns_base_df[_cod_m.isin(_muns_sara_pre)]
+
+        muns_opciones = sorted(muns_base_df["municipio_origen"].dropna().unique().tolist())
+        municipios_sel = st.multiselect(
+            "Municipio origen", options=muns_opciones,
+            default=[], placeholder="Todos los municipios"
+        )
+
     with g3:
-        paises_sel = st.multiselect("País de origen", options=paises_lista,
-                                    default=[], placeholder="Todos los países")
+        paises_sel = st.multiselect(
+            "País de origen", options=paises_lista,
+            default=[], placeholder="Todos los países"
+        )
     with g4:
-        st.markdown('<div style="font-size:0.82rem;color:#9EABC0;padding-top:1.6rem;">Flujos internacionales en mapa</div>',
-                    unsafe_allow_html=True)
-        mostrar_flujos_intl = st.toggle("Flujos internacionales en mapa", value=False,
-                                         label_visibility="collapsed")
+        st.markdown(
+            '<div style="font-size:0.82rem;color:#9EABC0;padding-top:1.6rem;">'
+            'Flujos internacionales en mapa</div>',
+            unsafe_allow_html=True
+        )
+        mostrar_flujos_intl = st.toggle(
+            "Flujos internacionales en mapa", value=False, label_visibility="collapsed"
+        )
     with g5:
-        st.markdown('<div style="font-size:0.82rem;color:#9EABC0;padding-top:1.6rem;">'
-                    '🔀 Máx. flujos en mapa</div>', unsafe_allow_html=True)
-        max_flujos = st.slider("Máx. flujos", min_value=100, max_value=2000,
-                               value=MAX_LINEAS_MAPA, step=100, label_visibility="collapsed")
+        st.markdown(
+            '<div style="font-size:0.82rem;color:#9EABC0;padding-top:1.6rem;">'
+            '🔀 Máx. flujos en mapa</div>', unsafe_allow_html=True
+        )
+        max_flujos = st.slider(
+            "Máx. flujos", min_value=100, max_value=2000,
+            value=MAX_LINEAS_MAPA, step=100, label_visibility="collapsed"
+        )
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # ── Expander SARA — debajo de los filtros principales ────
+    # ── Filtros SARA agrupados y alineados con Municipios_Nacional_Base_Completa.xlsx ──
     with st.expander("**FILTROS DEL PROYECTO SARA**", expanded=False):
-        sc1, sc2, sc3 = st.columns([1.0, 1.2, 1.2])
-        with sc1:
-            solo_priorizados = st.checkbox(
-                "Rubros priorizados SARA", value=False,
-                key="_cb_solo_prio",
-                help="Filtra el selector de Rubro a los 36 rubros priorizados SARA"
-            )
-            st.markdown('<div style="font-size:0.8rem;color:#9EABC0;margin-top:0.6rem;">Municipios priorizados</div>', unsafe_allow_html=True)
-            prio_oferta  = st.checkbox("Oferta",  value=False, key="prio_oferta")
-            prio_demanda = st.checkbox("Demanda", value=False, key="prio_demanda")
-            st.markdown('<div style="font-size:0.8rem;color:#9EABC0;margin-top:0.6rem;">Alcance regional</div>', unsafe_allow_html=True)
-            prio_region_central      = st.checkbox("Región Central",      value=False, key="prio_rc")
-            prio_region_metropolitana = st.checkbox("Región Metropolitana", value=False, key="prio_rm")
-        territorios_opciones = sorted(TERRITORIOS_FUNC.keys())
-        mitad = (len(territorios_opciones) + 1) // 2
-        territorio_checks = {}
-        with sc2:
-            st.markdown('<div style="font-size:0.8rem;color:#9EABC0;margin-bottom:0.3rem;">Territorio funcional</div>', unsafe_allow_html=True)
-            for t in territorios_opciones[:mitad]:
-                territorio_checks[t] = st.checkbox(t, value=False, key=f"terr_{t}")
-        with sc3:
-            st.markdown('<div style="font-size:0.8rem;color:#9EABC0;margin-bottom:0.3rem;">&nbsp;</div>', unsafe_allow_html=True)
-            for t in territorios_opciones[mitad:]:
-                territorio_checks[t] = st.checkbox(t, value=False, key=f"terr_{t}")
-    territorio_sel = [t for t, v in territorio_checks.items() if v]
+        sc1, sc2, sc3 = st.columns([1.05, 1.05, 1.25])
 
-    # Aplicar filtro de priorizados al selector de rubros
+        with sc1:
+            st.markdown("**Producto y alcance territorial**")
+            solo_priorizados = st.checkbox(
+                "Rubros priorizados SARA", value=False, key="_cb_solo_prio",
+                help="Restringe el selector de rubro a los rubros priorizados por el proyecto."
+            )
+            sara_region_sel = st.selectbox(
+                "Ámbito territorial",
+                [
+                    "Sin filtro territorial",
+                    "Región Central completa",
+                    "Región Central externa",
+                    "Región Metropolitana Bogotá-Cundinamarca",
+                ],
+                key="sara_region",
+                help=(
+                    "Según la base territorial: Región Central completa = 353 municipios; "
+                    "Región Central externa = 236; Región Metropolitana Bogotá-Cundinamarca = 117."
+                )
+            )
+
+        with sc2:
+            st.markdown("**Priorización y muestra UTF/COL/178**")
+            sara_roles_sel = st.multiselect(
+                "Rol de priorización inicial",
+                ["Oferta", "Demanda", "Oferta y demanda"],
+                default=[], key="sara_roles",
+                help="Categorías exactas de la variable muni_priori178."
+            )
+            sara_muestra = st.checkbox(
+                "Muestra final de información primaria", value=False, key="sara_muestra",
+                help="50 municipios marcados con muni_muestra178 = 1."
+            )
+            sara_conmutados = st.checkbox(
+                "Municipios conmutados con Bogotá", value=False, key="sara_conmutados",
+                help="10 municipios marcados con muni_conmutados = 1."
+            )
+
+        with sc3:
+            st.markdown("**Territorio funcional de la RMBC**")
+            territorio_sel = st.multiselect(
+                "Territorio funcional",
+                sorted(TERRITORIOS_FUNC.keys()),
+                default=[], key="sara_territorios",
+                placeholder="Todos los territorios"
+            )
+            st.caption(
+                "Las selecciones de distintas categorías se combinan por intersección; "
+                "varias opciones dentro de un mismo selector se combinan por unión."
+            )
+
+    # Aplicar filtro de priorizados al selector de rubros.
     if solo_priorizados and not rubros_sel:
         rubros_sel = list(RUBROS_PRIORIZADOS_SARA)
 
-    # Resolver municipios priorizados — SOLO oferta/demanda/metropolitana
-    # El territorio funcional se aplica SEPARADO (en muns_prio_t para la consulta
-    # y en muns_resalte para el mapa), no mezclado con oferta/demanda
-    if prio_oferta and prio_demanda:
-        muns_prio = MUNS_AMBOS
-    elif prio_oferta:
-        muns_prio = MUNS_OFERTA
-    elif prio_demanda:
-        muns_prio = MUNS_DEMANDA
-    else:
-        muns_prio = None
+    muns_prio_consulta = _interseccion_sara(
+        sara_region_sel, sara_roles_sel, sara_muestra, sara_conmutados, territorio_sel
+    )
 
-    if prio_region_metropolitana:
-        muns_prio = (muns_prio & MUNS_REGION_METROPOLITANA) if muns_prio else set(MUNS_REGION_METROPOLITANA)
-
-    # Territorio funcional — conjunto separado para consulta y mapa
+    # Variables auxiliares para mapa/leyenda.
+    prio_region_central = sara_region_sel == "Región Central completa"
+    prio_region_central_externa = sara_region_sel == "Región Central externa"
+    prio_region_metropolitana = sara_region_sel == "Región Metropolitana Bogotá-Cundinamarca"
     muns_territorio_consulta = set()
-    if territorio_sel:
-        for t in territorio_sel:
-            muns_territorio_consulta.update(TERRITORIOS_FUNC.get(t, []))
+    for t in territorio_sel:
+        muns_territorio_consulta.update(TERRITORIOS_FUNC.get(t, set()))
+    muns_prio = set()
+    for rol in sara_roles_sel:
+        muns_prio.update(MUNS_PRIORI_ROL.get(rol, set()))
 
-    # muns_prio_t para la consulta SQL: intersección de oferta/demanda/metro CON territorio si aplica
-    if muns_territorio_consulta and muns_prio:
-        muns_prio_consulta = muns_prio & muns_territorio_consulta
-    elif muns_territorio_consulta:
-        muns_prio_consulta = muns_territorio_consulta
-    elif muns_prio:
-        muns_prio_consulta = muns_prio
-    else:
-        muns_prio_consulta = None
+    _sara_desc = []
+    if sara_region_sel != "Sin filtro territorial":
+        _sara_desc.append(sara_region_sel)
+    if sara_roles_sel:
+        _sara_desc.append("Rol: " + ", ".join(sara_roles_sel))
+    if sara_muestra:
+        _sara_desc.append("Muestra final")
+    if sara_conmutados:
+        _sara_desc.append("Municipios conmutados")
+    if territorio_sel:
+        _sara_desc.append("Territorio funcional")
+    sara_filtro_label = (
+        _sara_desc[0] if len(_sara_desc) == 1
+        else "Filtros SARA (intersección)" if _sara_desc
+        else ""
+    )
 
     if isinstance(rango, tuple) and len(rango) == 2:
         fecha_ini, fecha_fin = rango
     else:
         fecha_ini, fecha_fin = fecha_min_g, fecha_max_g
 
-    centrales_t   = tuple(centrales_sel)
-    deptos_t      = tuple([d for d in deptos_sel if d != "INTERNACIONAL"])
-    # Región Central restringe deptos cuando no hay otro depto seleccionado
-    if prio_region_central and not deptos_t:
-        deptos_t = tuple(DEPTOS_REGION_CENTRAL)
-    rubros_t      = tuple(rubros_sel)
-    municipios_t  = tuple(municipios_sel) if municipios_sel else ()
-    paises_t      = tuple(paises_sel) if paises_sel else ()
-    muns_prio_t   = tuple(sorted(muns_prio_consulta)) if muns_prio_consulta else ()
+    centrales_t  = tuple(centrales_sel)
+    deptos_t     = tuple(deptos_sel)
+    rubros_t     = tuple(rubros_sel)
+    municipios_t = tuple(municipios_sel) if municipios_sel else ()
+    if muns_prio_consulta is None:
+        muns_prio_t = ()
+    elif muns_prio_consulta:
+        muns_prio_t = tuple(sorted(muns_prio_consulta))
+    else:
+        # Intersección SARA válida pero sin municipios: forzar consulta sin resultados.
+        muns_prio_t = ("__SIN_COINCIDENCIAS_SARA__",)
 
-    # ── Lógica de internacionales ─────────────────────────────
-    # incluir_intl: mostrar datos internacionales
-    incluir_intl = (
-        "INTERNACIONAL" in deptos_sel
-        or bool(paises_sel)
-        or not deptos_sel
-    )
-    # solo_internacional: SOLO mostrar internacionales (sin datos nacionales)
-    # Ocurre cuando el único filtro de origen es INTERNACIONAL o países
-    solo_internacional = (
-        bool(paises_sel) and not deptos_t and not municipios_t
-    ) or (
-        bool(deptos_sel)
-        and all(d == "INTERNACIONAL" for d in deptos_sel)
-        and not municipios_t
-    )
-    # excluir_nacional: hay filtro de depto/municipio nacional pero no INTERNACIONAL
-    excluir_intl_por_depto = bool(deptos_t) and "INTERNACIONAL" not in deptos_sel and not paises_sel
+    # ── Lógica de país de origen ─────────────────────────────
+    # País vacío = todos los orígenes. COLOMBIA permite aislar los flujos internos.
+    paises_extranjeros_sel = [p for p in paises_sel if p != "COLOMBIA"]
+    mostrar_nacional = (not paises_sel) or ("COLOMBIA" in paises_sel)
+    mostrar_internacional = (not paises_sel) or bool(paises_extranjeros_sel)
+
+    # Si se filtra por departamento/municipio y no se pidió explícitamente un país extranjero,
+    # el resultado queda naturalmente restringido a Colombia.
+    if (deptos_sel or municipios_sel or muns_prio_consulta is not None) and not paises_extranjeros_sel:
+        mostrar_internacional = False
+
+    paises_t = tuple(paises_extranjeros_sel)
+    incluir_intl = mostrar_internacional
+    solo_internacional = mostrar_internacional and not mostrar_nacional
 
     rubro_unico       = rubros_sel[0] if len(rubros_sel) == 1 else None
     tiene_rubro_unico = len(rubros_sel) == 1
@@ -1073,26 +1186,46 @@ with tab1:
     _empty_tot = pd.DataFrame([{"vol_total":0}])
     _empty_rap = pd.DataFrame([{"vol_rape":0}])
 
-    if solo_internacional:
-        # Solo mostrar internacionales — vaciar todo lo nacional
-        met_df             = _empty_met
-        tot_df             = _empty_tot
-        rape_df            = _empty_rap
-        rank_df            = pd.DataFrame()
-        serie_ab_df        = pd.DataFrame()
-        flujos_df          = pd.DataFrame()
-        sankey_df          = pd.DataFrame()
-        serie_pr_df        = pd.DataFrame()
-        precios_central_df = pd.DataFrame()
+    if not mostrar_nacional:
+        # País(es) extranjero(s) sin Colombia: vaciar abastecimiento nacional.
+        met_df      = _empty_met
+        tot_df      = _empty_tot
+        rape_df     = _empty_rap
+        rank_df     = pd.DataFrame()
+        serie_ab_df = pd.DataFrame()
+        flujos_df   = pd.DataFrame()
+        sankey_df   = pd.DataFrame()
     else:
         met_df, tot_df, rape_df, rank_df, serie_ab_df, flujos_df, sankey_df = consultar_abast(
             fecha_ini, fecha_fin, semestre_sel, grupo_sel, rubros_t,
             centrales_t, deptos_t, muns_prio_t, municipios_t, mtime_ab
         )
-        serie_pr_df, precios_central_df = consultar_precios(
+
+    # Los precios SIPSA son de la central de destino; siguen siendo consultables
+    # aunque el origen seleccionado sea internacional.
+    serie_pr_df, precios_central_df = consultar_precios(
+        fecha_ini, fecha_fin, semestre_sel, grupo_sel, rubros_t,
+        centrales_t, mtime_pr
+    )
+
+    precios_municipio_df = pd.DataFrame()
+    precios_flujo_df = pd.DataFrame()
+    precio_prom_flujo = None
+    if mostrar_nacional and tiene_rubro_unico:
+        (
+            precios_municipio_df,
+            precios_flujo_df,
+            serie_pr_flujo_df,
+            precio_prom_flujo,
+        ) = consultar_precios_por_flujo(
             fecha_ini, fecha_fin, semestre_sel, grupo_sel, rubros_t,
-            centrales_t, mtime_pr
+            centrales_t, deptos_t, muns_prio_t, municipios_t,
+            mtime_ab, mtime_pr
         )
+        if not serie_pr_flujo_df.empty:
+            # La serie de precio también se pondera por las toneladas realmente
+            # abastecidas a cada central en cada mes.
+            serie_pr_df = serie_pr_flujo_df
 
     # ── Datos internacionales ─────────────────────────────────
     @st.cache_data(show_spinner=False)
@@ -1101,7 +1234,10 @@ with tab1:
         if not RUTA_INTERNACIONALES.exists():
             return pd.DataFrame()
         con = get_con_intl(mtime_intl)
-        c = ["fecha_mes BETWEEN ? AND ?"]
+        c = [
+            "fecha_mes BETWEEN ? AND ?",
+            "UPPER(TRIM(pais_origen)) <> 'COLOMBIA'"
+        ]
         p = [fecha_ini.isoformat(), fecha_fin.isoformat()]
         if semestre == "Primer semestre":    c.append("mes BETWEEN 1 AND 6")
         elif semestre == "Segundo semestre": c.append("mes BETWEEN 7 AND 12")
@@ -1127,7 +1263,7 @@ with tab1:
             df = pd.DataFrame()
         return df
 
-    if incluir_intl and not excluir_intl_por_depto:
+    if incluir_intl:
         intl_raw = consultar_internacionales(
             fecha_ini, fecha_fin, semestre_sel, grupo_sel, rubros_t,
             centrales_t, paises_t, mtime_intl
@@ -1179,14 +1315,18 @@ with tab1:
     vol_rape   = _sf(rape_df, "vol_rape")
 
     # Toneladas internacionales — se suman si hay datos intl activos
-    vol_intl         = intl_df["toneladas_total"].sum() if not intl_df.empty else 0.0
+    vol_intl         = intl_raw["toneladas_total"].sum() if not intl_raw.empty else 0.0
     vol_filtro_total = vol_filtro + vol_intl
 
     # Precio promedio general — solo válido con un único rubro seleccionado
     precio_prom_general = (
-        serie_pr_df["precio_promedio"].mean()
-        if not serie_pr_df.empty and tiene_rubro_unico
-        else None
+        precio_prom_flujo
+        if precio_prom_flujo is not None
+        else (
+            serie_pr_df["precio_promedio"].mean()
+            if not serie_pr_df.empty and tiene_rubro_unico
+            else None
+        )
     )
 
     # =========================================================
@@ -1204,37 +1344,35 @@ with tab1:
         rk["score_act"]   = norm_serie(rk["meses_participacion"])
         top30 = set(rk.sort_values("toneladas_total", ascending=False).head(30)["cod_municipio"].astype(str))
 
-        # ── Cruzar precio por central con flujos ──────────────────
-        if not flujos_df.empty and not precios_central_df.empty:
-            flujos_df = flujos_df.merge(
-                precios_central_df[["central_mayorista","precio_central"]],
-                on="central_mayorista", how="left"
+        # ── Precio por municipio condicionado al flujo real ────────
+        # El precio no se asigna simplemente desde la central. Se calcula usando
+        # únicamente los meses y centrales a los que el municipio efectivamente
+        # envió toneladas, ponderando cada precio central-mes por ese volumen.
+        if tiene_rubro_unico and not precios_municipio_df.empty:
+            rk = rk.merge(
+                precios_municipio_df[["cod_municipio","precio_municipio"]],
+                on="cod_municipio", how="left"
             )
-        elif not flujos_df.empty:
-            flujos_df["precio_central"] = np.nan
-
-        # Precio por municipio — Opción A:
-        # Se usa SOLO el precio de las centrales que aparecen en los flujos filtrados.
-        # Si el usuario filtra por Corabastos, el precio de cada municipio es
-        # el de Corabastos únicamente, sin mezclar otras centrales sin precio.
-        # Esto evita NaN cuando el municipio abastece a otras centrales sin dato de precio.
-        if not flujos_df.empty and "precio_central" in flujos_df.columns:
-            # Solo usar flujos que SÍ tienen precio (centrales filtradas con dato)
-            sub = flujos_df.dropna(subset=["precio_central"])
-            if not sub.empty:
-                # Precio ponderado por toneladas — solo sobre centrales con precio disponible
-                pm = (
-                    sub.groupby("cod_municipio")
-                    .apply(lambda g: np.average(g["precio_central"], weights=g["toneladas_total"])
-                           if g["toneladas_total"].sum() > 0 else np.nan)
-                    .reset_index()
-                )
-                pm.columns = ["cod_municipio", "precio_municipio"]
-                rk = rk.merge(pm, on="cod_municipio", how="left")
-            else:
-                rk["precio_municipio"] = np.nan
         else:
             rk["precio_municipio"] = np.nan
+
+        if not flujos_df.empty:
+            if tiene_rubro_unico and not precios_municipio_df.empty:
+                flujos_df = flujos_df.merge(
+                    precios_municipio_df[["cod_municipio","precio_municipio"]],
+                    on="cod_municipio", how="left"
+                )
+            else:
+                flujos_df["precio_municipio"] = np.nan
+
+            if tiene_rubro_unico and not precios_flujo_df.empty:
+                flujos_df = flujos_df.merge(
+                    precios_flujo_df,
+                    on=["cod_municipio","central_mayorista"],
+                    how="left"
+                )
+            else:
+                flujos_df["precio_flujo"] = np.nan
 
         # ── Índice con precio si hay rubro seleccionado ───────────
         precio_ref_global = rk["precio_municipio"].median() if rk["precio_municipio"].notna().any() else 0
@@ -1260,31 +1398,18 @@ with tab1:
             vmin, vmax    = flujos_df["toneladas_total"].min(), flujos_df["toneladas_total"].max()
             flujos_df["ancho"]      = 2 + 10*((flujos_df["toneladas_total"]-vmin)/(vmax-vmin+1e-9))
             flujos_df["ton_fmt"]    = flujos_df["toneladas_total"].map(formatear_ton)
-            flujos_df["precio_fmt"] = flujos_df["precio_central"].map(formatear_cop) \
-                                      if "precio_central" in flujos_df.columns \
+            flujos_df["precio_fmt"] = flujos_df["precio_municipio"].map(formatear_cop) \
+                                      if "precio_municipio" in flujos_df.columns \
                                       else "Sin dato"
+            flujos_df["precio_flujo_fmt"] = flujos_df["precio_flujo"].map(formatear_cop) \
+                                            if "precio_flujo" in flujos_df.columns \
+                                            else "Sin dato"
         else:
             pct_cobertura = 0
 
-        if not sankey_df.empty:
-            top_mun = sankey_df.groupby("municipio_origen")["toneladas_total"].sum().nlargest(10).index.tolist()
-            sk_top  = sankey_df[sankey_df["municipio_origen"].isin(top_mun)].copy()
-        else:
-            sk_top = pd.DataFrame(columns=["municipio_origen","central_mayorista","toneladas_total"])
-
-        # Agregar internacionales al Sankey
-        if not intl_df.empty:
-            intl_sk = intl_df.groupby(["pais_origen","central_mayorista"], as_index=False).agg(
-                toneladas_total=("toneladas_total","sum")
-            ).rename(columns={"pais_origen":"municipio_origen"})
-            intl_sk["municipio_origen"] = "* " + intl_sk["municipio_origen"]
-            top_paises = intl_df.groupby("pais_origen")["toneladas_total"].sum().nlargest(2).index.tolist()
-            intl_sk = intl_sk[intl_sk["municipio_origen"].isin(["* " + p for p in top_paises])]
-            sk_top = pd.concat([sk_top, intl_sk], ignore_index=True)
-
         # Agregar internacionales al ranking (para mostrar en tabla)
-        if not intl_df.empty:
-            intl_rk_agg = intl_df.groupby("pais_origen", as_index=False).agg(
+        if not intl_raw.empty:
+            intl_rk_agg = intl_raw.groupby("pais_origen", as_index=False).agg(
                 toneladas_total=("toneladas_total","sum"),
                 meses_participacion=("toneladas_total","count"),
             )
@@ -1316,6 +1441,82 @@ with tab1:
         sk_top    = pd.DataFrame(columns=["municipio_origen","central_mayorista","toneladas_total"])
         pct_cobertura = 0
 
+    # ── Orígenes internacionales en la tabla, incluso si no hay flujo nacional ──
+    if not intl_raw.empty:
+        _ya_tiene_intl = (
+            not rk.empty
+            and "departamento_origen" in rk.columns
+            and rk["departamento_origen"].astype(str).eq("Internacional").any()
+        )
+        if not _ya_tiene_intl:
+            intl_rk_agg = (
+                intl_raw.groupby("pais_origen", as_index=False)
+                .agg(toneladas_total=("toneladas_total","sum"))
+            )
+            intl_rk_agg["municipio_origen"] = "🌎 " + intl_rk_agg["pais_origen"]
+            intl_rk_agg["departamento_origen"] = "Internacional"
+            intl_rk_agg["cod_municipio"] = "intl"
+            intl_rk_agg["meses_participacion"] = np.nan
+            intl_rk_agg["precio_municipio"] = np.nan
+            intl_rk_agg["ventaja_precio"] = np.nan
+            intl_rk_agg["part_filtro"] = (
+                intl_rk_agg["toneladas_total"] / vol_filtro_total * 100
+                if vol_filtro_total > 0 else 0.0
+            )
+            intl_rk_agg["part_total"] = 0.0
+            intl_rk_agg["part_rape"] = 0.0
+            intl_rk_agg["indice"] = np.nan
+
+            cols_comunes = [
+                "municipio_origen","departamento_origen","cod_municipio",
+                "toneladas_total","meses_participacion","part_filtro",
+                "part_total","part_rape","precio_municipio","ventaja_precio","indice"
+            ]
+            if rk.empty:
+                rk = pd.DataFrame(columns=cols_comunes)
+            for col in cols_comunes:
+                if col not in rk.columns:
+                    rk[col] = np.nan
+                if col not in intl_rk_agg.columns:
+                    intl_rk_agg[col] = np.nan
+            rk = pd.concat([rk, intl_rk_agg[cols_comunes]], ignore_index=True)
+            rk = rk.sort_values("toneladas_total", ascending=False).reset_index(drop=True)
+            rk["ranking"] = rk.index + 1
+
+    # ── Sankey independiente del ranking ─────────────────────
+    # Importante: usa los datos internacionales crudos, no solo los que tienen
+    # coordenadas válidas para el mapa. Así un filtro por país nunca vacía el Sankey.
+    _sk_parts = []
+    if not sankey_df.empty:
+        top_mun = (
+            sankey_df.groupby("municipio_origen")["toneladas_total"]
+            .sum().nlargest(10).index.tolist()
+        )
+        _sk_parts.append(
+            sankey_df[sankey_df["municipio_origen"].isin(top_mun)].copy()
+        )
+
+    if not intl_raw.empty:
+        intl_sk = (
+            intl_raw.groupby(["pais_origen","central_mayorista"], as_index=False)
+            .agg(toneladas_total=("toneladas_total","sum"))
+            .rename(columns={"pais_origen":"municipio_origen"})
+        )
+        top_paises = (
+            intl_raw.groupby("pais_origen")["toneladas_total"]
+            .sum().nlargest(10).index.tolist()
+        )
+        intl_sk = intl_sk[intl_sk["municipio_origen"].isin(top_paises)].copy()
+        intl_sk["municipio_origen"] = "🌎 " + intl_sk["municipio_origen"]
+        _sk_parts.append(intl_sk)
+
+    if _sk_parts:
+        sk_top = pd.concat(_sk_parts, ignore_index=True)
+    else:
+        sk_top = pd.DataFrame(
+            columns=["municipio_origen","central_mayorista","toneladas_total"]
+        )
+
     # =========================================================
     # MAPA — polígonos con colores por estado
     # deptos_sel resalta municipios del departamento en amarillo
@@ -1324,28 +1525,9 @@ with tab1:
 
     deptos_sel_upper = {d.upper() for d in deptos_sel if d != "INTERNACIONAL"}
 
-    # Municipios a resaltar en el mapa (separado de la lógica de consulta):
-    # Prioridad: territorio > región metropolitana > oferta/demanda
-    # El territorio muestra sus polígonos completos (sin intersección)
-    if muns_territorio_consulta:
-        muns_resalte = muns_territorio_consulta
-    elif prio_region_metropolitana:
-        muns_resalte = MUNS_REGION_METROPOLITANA
-    elif muns_prio:
-        muns_resalte = muns_prio
-    else:
-        muns_resalte = set()
-
-    # Región Central: resaltar todos los municipios de los deptos RAPE
+    # Municipios a resaltar: resultado exacto de la intersección de filtros SARA.
+    muns_resalte = set(muns_prio_consulta) if muns_prio_consulta is not None else set()
     muns_region_central_set = set()
-    if prio_region_central:
-        if "cod_municipio" in municipios_df.columns:
-            muns_region_central_set = set(
-                municipios_df[
-                    municipios_df["departamento_origen"].str.upper().isin(DEPTOS_REGION_CENTRAL)
-                ]["cod_municipio"].astype(str).tolist()
-            )
-
     top30_map = set() if solo_internacional else top30
 
     def color_fill(codigo, depto):
@@ -1381,11 +1563,21 @@ with tab1:
         color_line(c, d)
         for c, d in zip(mun_web["codigo_origen"].astype(str), mun_web["departamento"])
     ]
+    if not rk.empty and "precio_municipio" in rk.columns:
+        _pm_map = rk[["cod_municipio","precio_municipio"]].copy()
+        _pm_map["cod_municipio"] = _pm_map["cod_municipio"].apply(normalizar_codigo_5)
+        _pm_map = _pm_map.dropna(subset=["cod_municipio"]).drop_duplicates("cod_municipio")
+        mun_web = mun_web.merge(
+            _pm_map, left_on="codigo_origen", right_on="cod_municipio", how="left"
+        )
+    else:
+        mun_web["precio_municipio"] = np.nan
+
     mun_web["tipo_elemento"] = "Municipio"
     mun_web["detalle_1"] = "Nombre: "       + mun_web["nombre_municipio"].fillna("Sin nombre").astype(str)
     mun_web["detalle_2"] = "Departamento: " + mun_web["departamento"].fillna("Sin dato").astype(str)
     mun_web["detalle_3"] = "Código: "       + mun_web["codigo_origen"].fillna("").astype(str)
-    mun_web["detalle_4"] = ""
+    mun_web["detalle_4"] = "Precio estimado: " + mun_web["precio_municipio"].map(formatear_cop)
 
     geojson_mun = json.loads(
         mun_web[["fill_color","line_color","tipo_elemento",
@@ -1411,9 +1603,16 @@ with tab1:
     if _cent_parts:
         cent_pts = pd.concat(_cent_parts, ignore_index=True)
         cent_pts = cent_pts.drop_duplicates(subset=["central_mayorista"]).reset_index(drop=True)
+        if tiene_rubro_unico and not precios_central_df.empty:
+            cent_pts = cent_pts.merge(
+                precios_central_df[["central_mayorista","precio_central"]],
+                on="central_mayorista", how="left"
+            )
+        else:
+            cent_pts["precio_central"] = np.nan
         cent_pts["tipo_elemento"] = "Central mayorista"
         cent_pts["detalle_1"]     = "Central: " + cent_pts["nombre"].fillna("")
-        cent_pts["detalle_2"]     = ""
+        cent_pts["detalle_2"]     = "Precio SIPSA central: " + cent_pts["precio_central"].map(formatear_cop)
         cent_pts["detalle_3"]     = ""
         cent_pts["detalle_4"]     = ""
     else:
@@ -1426,7 +1625,7 @@ with tab1:
         flujos_df["detalle_1"]     = "Origen: "        + flujos_df["municipio_origen"].fillna("")
         flujos_df["detalle_2"]     = "Central: "        + flujos_df["central_mayorista"].fillna("")
         flujos_df["detalle_3"]     = "Toneladas: "      + flujos_df["ton_fmt"].fillna("")
-        flujos_df["detalle_4"]     = "Precio central: " + flujos_df["precio_fmt"].fillna("Sin dato")
+        flujos_df["detalle_4"]     = "Precio mun.: " + flujos_df["precio_fmt"].fillna("Sin dato") + " | Precio OD: " + flujos_df["precio_flujo_fmt"].fillna("Sin dato")
 
     # =========================================================
     # LAYOUT PRINCIPAL
@@ -1483,19 +1682,14 @@ with tab1:
 
             st.markdown('<div class="panel-title">Leyenda</div>', unsafe_allow_html=True)
             leyenda_depto = ""
-            if any(d != "INTERNACIONAL" for d in deptos_sel):
+            if deptos_sel:
                 leyenda_depto = '<div class="legend-item"><span class="legend-box" style="background:#B0B8C8;border:1px solid #888;"></span>Municipios depto. filtrado</div>'
             leyenda_intl = ""
             if mostrar_flujos_intl and not intl_df.empty:
                 leyenda_intl = '<div class="legend-item"><span class="legend-box" style="background:#00C878;"></span>Flujos internacionales</div>'
             leyenda_territorio = ""
             if muns_resalte:
-                if territorio_sel and muns_prio and not territorio_sel == list(muns_prio):
-                    label_t = "Municipios SARA (intersección)"
-                elif territorio_sel:
-                    label_t = "Municipios territorio SARA"
-                else:
-                    label_t = "Municipios priorizados SARA"
+                label_t = sara_filtro_label or "Municipios filtrados SARA"
                 leyenda_territorio = f'<div class="legend-item"><span class="legend-box" style="background:#B4BED2;border:2px solid #D2DCF0;"></span>{label_t}</div>'
             st.markdown(f"""
             <div class="legend-item"><span class="legend-box" style="background:#6E44FF;"></span>Top 30 abastecedores</div>
@@ -1507,7 +1701,7 @@ with tab1:
             <div class="legend-item"><span class="legend-box" style="background:#00D2FF;"></span>Central mayorista</div>
             <div class="small-note" style="margin-top:0.75rem;">
                 <b>{max_flujos:,}</b> flujos visibles ({pct_cobertura:.0f}% del total).
-                Datos internacionales siempre en tabla e indicadores.
+                El origen nacional/internacional sigue el filtro «País de origen».
             </div>
             """, unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
@@ -1535,14 +1729,17 @@ with tab1:
                 ))
                 orig_pts = flujos_df.groupby(
                     ["municipio_origen","departamento_origen","cod_municipio"], as_index=False
-                ).agg(lon=("lon_orig","first"), lat=("lat_orig","first"),
-                      toneladas_total=("toneladas_total","sum"))
+                ).agg(
+                    lon=("lon_orig","first"), lat=("lat_orig","first"),
+                    toneladas_total=("toneladas_total","sum"),
+                    precio_municipio=("precio_municipio","first")
+                )
                 orig_pts = orig_pts.dropna(subset=["lon","lat"])
                 orig_pts["tipo_elemento"] = "Municipio de origen"
                 orig_pts["detalle_1"] = "Municipio: "    + orig_pts["municipio_origen"].fillna("")
                 orig_pts["detalle_2"] = "Departamento: " + orig_pts["departamento_origen"].fillna("")
                 orig_pts["detalle_3"] = "Toneladas: "    + orig_pts["toneladas_total"].map(formatear_ton)
-                orig_pts["detalle_4"] = ""
+                orig_pts["detalle_4"] = "Precio estimado: " + orig_pts["precio_municipio"].map(formatear_cop)
                 layers.append(pdk.Layer(
                     "ScatterplotLayer", data=orig_pts,
                     get_position="[lon, lat]", get_radius=4200,
@@ -1739,9 +1936,11 @@ with tab1:
 
         st.markdown("""
         <div class="method-note">
-            <b>Nota sobre el precio:</b> El dato de precio solo es interpretable cuando se selecciona
-            un <b>unico rubro</b>. Con multiples rubros o sin rubro seleccionado no se muestra precio.
-            Si una central no reporta precio para el rubro seleccionado en SIPSA, aparece "Sin dato".
+            <b>Nota sobre el precio:</b> El dato solo se muestra cuando se selecciona un
+            <b>único rubro</b>. El precio municipal se calcula con los precios SIPSA de las centrales
+            y meses en los que ese municipio efectivamente aportó toneladas, ponderados por el volumen
+            abastecido. Por eso dos municipios pueden tener precios ligeramente distintos incluso si
+            comparten centrales de destino. Si no existe precio SIPSA compatible, aparece "Sin dato".
         </div>
         """, unsafe_allow_html=True)
 
@@ -1756,485 +1955,3 @@ with tab1:
     render_tabla(rk=rk, vol_filtro=vol_filtro, vol_total=vol_total,
                  vol_rape=vol_rape, max_filas=MAX_FILAS_TABLA,
                  tiene_rubro_unico=tiene_rubro_unico)
-
-
-# =========================================================
-# PESTAÑA 2 — DESGLOSE POR VARIEDAD (PRIORIZADOS SARA)
-# =========================================================
-
-with tab2:
-
-    # ── Filtros fila 1 ────────────────────────────────────
-    st.markdown('<div class="filter-wrap">', unsafe_allow_html=True)
-    vf1, vf2, vf3, vf4, vf5 = st.columns([1.3, 1.6, 1.5, 1.0, 1.4])
-    with vf1:
-        rubros_var_labels = sorted([label_rubro(r) for r in alimentos_por_rubro.keys()])
-        rubros_var_sel_labels = st.multiselect(
-            "Rubro(s) priorizado(s)", options=rubros_var_labels,
-            default=[], placeholder="Selecciona uno o más rubros", key="var_rubros"
-        )
-        rubros_var_sel = [codigo_rubro(l) for l in rubros_var_sel_labels]
-    with vf2:
-        if rubros_var_sel:
-            alimentos_disp = sorted(set(
-                a for r in rubros_var_sel for a in alimentos_por_rubro.get(r, [])
-            ))
-        else:
-            alimentos_disp = sorted(set(
-                a for alims in alimentos_por_rubro.values() for a in alims
-            ))
-        alimentos_sel = st.multiselect(
-            "Alimento(s)", options=alimentos_disp,
-            default=[], placeholder="Todos los alimentos del rubro", key="var_alimentos"
-        )
-    with vf3:
-        centrales_var_sel = st.multiselect(
-            "Central mayorista", options=centrales_var,
-            default=[], placeholder="Todas las centrales", key="var_centrales"
-        )
-    with vf4:
-        semestre_var = st.selectbox(
-            "Periodo", ["Todos","Primer semestre","Segundo semestre"],
-            index=0, key="var_semestre"
-        )
-    with vf5:
-        fecha_min_v, fecha_max_v = rango_var
-        rango_var_sel = st.date_input(
-            "Fechas", value=(fecha_min_v, fecha_max_v),
-            min_value=fecha_min_v, max_value=fecha_max_v, key="var_fechas"
-        )
-    st.markdown('<div style="height:0.4rem;"></div>', unsafe_allow_html=True)
-
-    # ── Filtros fila 2 ────────────────────────────────────
-    vg1, vg2, vg3, vg4 = st.columns([1.3, 1.5, 0.9, 1.0])
-    with vg1:
-        deptos_var_sel = st.multiselect(
-            "Depto. origen", deptos, default=[], key="var_deptos"
-        )
-    with vg2:
-        deptos_var_sin_intl = [d for d in deptos_var_sel if d != "INTERNACIONAL"]
-        if deptos_var_sin_intl:
-            muns_v_base = municipios_df[
-                municipios_df["departamento_origen"].isin(deptos_var_sin_intl)
-            ]["municipio_origen"].unique().tolist()
-        else:
-            muns_v_base = municipios_df["municipio_origen"].unique().tolist()
-        municipios_var_sel = st.multiselect(
-            "Municipio origen", options=sorted(muns_v_base),
-            default=[], placeholder="Todos los municipios", key="var_municipios"
-        )
-    with vg3:
-        st.markdown('<div style="font-size:0.82rem;color:#9EABC0;padding-top:1.6rem;">Flujos intl. en mapa</div>',
-                    unsafe_allow_html=True)
-        mostrar_flujos_intl_v = st.toggle("Flujos intl", value=False,
-                                           label_visibility="collapsed", key="var_toggle_intl")
-    with vg4:
-        st.markdown('<div style="font-size:0.82rem;color:#9EABC0;padding-top:1.6rem;">🔀 Máx. flujos</div>',
-                    unsafe_allow_html=True)
-        max_flujos_v = st.slider("Máx. flujos var", min_value=100, max_value=2000,
-                                  value=600, step=100, label_visibility="collapsed",
-                                  key="var_flujos")
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # ── Expander SARA propio ──────────────────────────────
-    with st.expander("**FILTROS DEL PROYECTO SARA**", expanded=False):
-        vsc1, vsc2, vsc3 = st.columns([1.0, 1.2, 1.2])
-        with vsc1:
-            st.markdown('<div style="font-size:0.8rem;color:#9EABC0;margin-bottom:0.3rem;">Municipios priorizados</div>',
-                        unsafe_allow_html=True)
-            v_prio_oferta  = st.checkbox("Oferta",  value=False, key="var_prio_oferta")
-            v_prio_demanda = st.checkbox("Demanda", value=False, key="var_prio_demanda")
-            st.markdown('<div style="font-size:0.8rem;color:#9EABC0;margin-top:0.5rem;">Alcance regional</div>',
-                        unsafe_allow_html=True)
-            v_prio_rc = st.checkbox("Región Central",       value=False, key="var_prio_rc")
-            v_prio_rm = st.checkbox("Región Metropolitana", value=False, key="var_prio_rm")
-        territorios_v_opts = sorted(TERRITORIOS_FUNC.keys())
-        mitad_v = (len(territorios_v_opts) + 1) // 2
-        terr_v_checks = {}
-        with vsc2:
-            st.markdown('<div style="font-size:0.8rem;color:#9EABC0;margin-bottom:0.3rem;">Territorio funcional</div>',
-                        unsafe_allow_html=True)
-            for t in territorios_v_opts[:mitad_v]:
-                terr_v_checks[t] = st.checkbox(t, value=False, key=f"var_terr_{t}")
-        with vsc3:
-            st.markdown('<div style="font-size:0.8rem;color:#9EABC0;margin-bottom:0.3rem;">&nbsp;</div>',
-                        unsafe_allow_html=True)
-            for t in territorios_v_opts[mitad_v:]:
-                terr_v_checks[t] = st.checkbox(t, value=False, key=f"var_terr_{t}")
-    territorio_var_sel = [t for t, v in terr_v_checks.items() if v]
-
-    # ── Resolver filtros SARA ─────────────────────────────
-    if v_prio_oferta and v_prio_demanda: muns_var_prio = MUNS_AMBOS
-    elif v_prio_oferta:                  muns_var_prio = MUNS_OFERTA
-    elif v_prio_demanda:                 muns_var_prio = MUNS_DEMANDA
-    else:                                muns_var_prio = None
-    if v_prio_rm:
-        muns_var_prio = (muns_var_prio & MUNS_REGION_METROPOLITANA) if muns_var_prio else set(MUNS_REGION_METROPOLITANA)
-    muns_var_terr = set()
-    for t in territorio_var_sel:
-        muns_var_terr.update(TERRITORIOS_FUNC.get(t, []))
-    if muns_var_terr and muns_var_prio:
-        muns_var_prio_c = muns_var_prio & muns_var_terr
-    elif muns_var_terr:
-        muns_var_prio_c = muns_var_terr
-    elif muns_var_prio:
-        muns_var_prio_c = muns_var_prio
-    else:
-        muns_var_prio_c = None
-
-    deptos_var_t   = tuple([d for d in deptos_var_sel if d != "INTERNACIONAL"])
-    if v_prio_rc and not deptos_var_t:
-        deptos_var_t = tuple(DEPTOS_REGION_CENTRAL)
-    incluir_intl_v = (
-        "INTERNACIONAL" in deptos_var_sel or mostrar_flujos_intl_v or not deptos_var_sel
-    )
-    rubros_var_t    = tuple(rubros_var_sel)
-    alimentos_var_t = tuple(alimentos_sel)
-    centrales_var_t = tuple(centrales_var_sel)
-    municipios_var_t = tuple(municipios_var_sel) if municipios_var_sel else ()
-    muns_var_prio_t  = tuple(sorted(muns_var_prio_c)) if muns_var_prio_c else ()
-
-    if isinstance(rango_var_sel, tuple) and len(rango_var_sel) == 2:
-        fecha_ini_v, fecha_fin_v = rango_var_sel
-    else:
-        fecha_ini_v, fecha_fin_v = fecha_min_v, fecha_max_v
-
-    if not rubros_var_sel and not alimentos_sel:
-        st.info("Selecciona al menos un rubro o alimento para visualizar el desglose por variedad.")
-    else:
-        with st.spinner("Consultando variedades..."):
-            flujos_v, serie_v, tabla_v, rubro_ref_v = consultar_var(
-                fecha_ini_v, fecha_fin_v, semestre_var,
-                rubros_var_t, alimentos_var_t, centrales_var_t,
-                deptos_var_t, municipios_var_t, muns_var_prio_t, mtime_var
-            )
-            # Internacionales por rubro
-            if incluir_intl_v and rubros_var_t:
-                intl_raw_v = consultar_internacionales(
-                    fecha_ini_v, fecha_fin_v, semestre_var,
-                    "Todos", rubros_var_t, centrales_var_t, (), mtime_intl
-                )
-                if not intl_raw_v.empty:
-                    def _np(s):
-                        s = str(s).upper().strip()
-                        return "".join(c for c in unicodedata.normalize("NFD", s)
-                                       if unicodedata.category(c) != "Mn")
-                    _llon = {_np(k): v[0] for k, v in PAISES_COORDS.items()}
-                    _llat = {_np(k): v[1] for k, v in PAISES_COORDS.items()}
-                    intl_raw_v["lon_orig"] = intl_raw_v["pais_origen"].map(lambda x: _llon.get(_np(x)))
-                    intl_raw_v["lat_orig"] = intl_raw_v["pais_origen"].map(lambda x: _llat.get(_np(x)))
-                    intl_df_v = intl_raw_v.dropna(subset=["lon_orig","lat_orig","lon_dest","lat_dest"]).copy()
-                    if not intl_df_v.empty:
-                        vi = intl_df_v["toneladas_total"].sum()
-                        vi_min, vi_max = intl_df_v["toneladas_total"].min(), intl_df_v["toneladas_total"].max()
-                        intl_df_v["ancho"] = 2 + 6*((intl_df_v["toneladas_total"]-vi_min)/(vi_max-vi_min+1e-9))
-                        intl_df_v["tipo_elemento"] = "Origen internacional"
-                        intl_df_v["detalle_1"] = "Pais: "      + intl_df_v["pais_origen"].fillna("")
-                        intl_df_v["detalle_2"] = "Central: "   + intl_df_v["central_mayorista"].fillna("")
-                        intl_df_v["detalle_3"] = "Toneladas: " + intl_df_v["toneladas_total"].map(formatear_ton)
-                        intl_df_v["detalle_4"] = ""
-                else:
-                    intl_df_v = pd.DataFrame()
-            else:
-                intl_df_v = pd.DataFrame()
-
-        if flujos_v.empty and intl_df_v.empty:
-            st.warning("No hay datos para los filtros seleccionados.")
-        else:
-            # ── Representatividad ─────────────────────────────
-            ton_var = flujos_v.groupby(["alimento","rubro"])["toneladas_total"].sum().reset_index() if not flujos_v.empty else pd.DataFrame()
-            precio_var = tabla_v.groupby("alimento")["precio_prom"].mean().reset_index() if not tabla_v.empty else pd.DataFrame()
-            if not rubro_ref_v.empty and not ton_var.empty:
-                ton_var = ton_var.merge(rubro_ref_v, on="rubro", how="left")
-                ton_var["repr_pct"] = (ton_var["toneladas_total"] / ton_var["ton_rubro"] * 100).round(1)
-                if not precio_var.empty:
-                    ton_var = ton_var.merge(precio_var, on="alimento", how="left")
-                    ton_var["vs_rubro"] = ton_var["precio_prom"] - ton_var["precio_prom_rubro"]
-
-            tot_ton_v = flujos_v["toneladas_total"].sum() if not flujos_v.empty else 0
-            vol_intl_v = intl_df_v["toneladas_total"].sum() if not intl_df_v.empty else 0
-            tot_ton_display = tot_ton_v + vol_intl_v
-
-            # ── Layout: izq indicadores | centro mapa | der serie
-            col_ind, col_map, col_ser = st.columns([1.0, 2.5, 1.8], gap="small")
-
-            with col_ind:
-                st.markdown('<div class="panel">', unsafe_allow_html=True)
-                st.markdown('<div class="panel-title">Indicadores</div>', unsafe_allow_html=True)
-                n_mun_v  = flujos_v["municipio_origen"].nunique() if not flujos_v.empty else 0
-                n_cent_v = flujos_v["central_mayorista"].nunique() if not flujos_v.empty else 0
-                if n_cent_v == 0 and not intl_df_v.empty:
-                    n_cent_v = intl_df_v["central_mayorista"].nunique()
-                st.markdown(f"""
-                <div class="metric-card">
-                    <div class="metric-label">Toneladas acumuladas</div>
-                    <div class="metric-value" style="font-size:1.3rem;">{tot_ton_display:,.0f}</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Municipios origen</div>
-                    <div class="metric-value" style="font-size:1.3rem;">{n_mun_v:,}</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Centrales activas</div>
-                    <div class="metric-value" style="font-size:1.3rem;">{n_cent_v}</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-                if not ton_var.empty and "repr_pct" in ton_var.columns:
-                    st.markdown('<div class="panel-title" style="margin-top:0.6rem;">Representatividad sobre el rubro</div>',
-                                unsafe_allow_html=True)
-                    for _, row in ton_var.iterrows():
-                        repr_pct = row.get("repr_pct")
-                        vs       = row.get("vs_rubro")
-                        precio_v_val = row.get("precio_prom")
-                        color_vs = "#00C878" if pd.notna(vs) and vs < 0 else ("#FF6B6B" if pd.notna(vs) and vs > 0 else "#9EABC0")
-                        texto_vs = ""
-                        if pd.notna(vs) and pd.notna(precio_v_val):
-                            signo = "↓ más bajo" if vs < 0 else "↑ más alto"
-                            texto_vs = f'<div style="font-size:0.75rem;color:{color_vs};">{signo} que promedio rubro (${abs(vs):,.0f}/kg)</div>'
-                        repr_txt = f"{repr_pct:.1f}% del rubro" if pd.notna(repr_pct) else "—"
-                        st.markdown(f"""
-                        <div style="background:#1E2530;border-radius:6px;padding:0.5rem 0.6rem;
-                            margin-bottom:0.4rem;border-left:3px solid #4DA3FF;">
-                            <div style="font-size:0.78rem;font-weight:600;color:#C8D8F0;">{row['alimento']}</div>
-                            <div style="font-size:0.82rem;color:#F5F7FA;">{repr_txt}</div>
-                            {texto_vs}
-                        </div>
-                        """, unsafe_allow_html=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-
-            with col_map:
-                st.markdown('<div class="panel-title">Mapa de flujos por alimento</div>',
-                            unsafe_allow_html=True)
-                ALIM_COLORS = [
-                    [245,176,65],[0,200,180],[255,99,132],[100,160,255],
-                    [255,206,86],[75,192,192],[200,100,255],[255,159,64],
-                    [180,220,120],[0,200,120],
-                ]
-                alimentos_unicos = sorted(flujos_v["alimento"].unique()) if not flujos_v.empty else []
-                color_map_v = {a: ALIM_COLORS[i % len(ALIM_COLORS)] for i, a in enumerate(alimentos_unicos)}
-
-                layers_v = []
-
-                if not flujos_v.empty:
-                    flujos_top = flujos_v.nlargest(max_flujos_v, "toneladas_total").copy()
-                    vmin = flujos_top["toneladas_total"].min()
-                    vmax = flujos_top["toneladas_total"].max()
-                    flujos_top["ancho"] = 1 + 7*((flujos_top["toneladas_total"]-vmin)/(vmax-vmin+1e-9))
-                    flujos_top["tipo_elemento"] = "Flujo variedad"
-                    flujos_top["detalle_1"] = "Alimento: "  + flujos_top["alimento"].fillna("")
-                    flujos_top["detalle_2"] = "Municipio: " + flujos_top["municipio_origen"].fillna("")
-                    flujos_top["detalle_3"] = "Toneladas: " + flujos_top["toneladas_total"].map(formatear_ton)
-                    flujos_top["detalle_4"] = "Precio: " + flujos_top["precio_prom"].map(
-                        lambda x: f"$ {x:,.0f}/kg" if pd.notna(x) else "Sin dato")
-                    layers_v.append(pdk.Layer(
-                        "ArcLayer", data=flujos_top,
-                        get_source_position=["lon_orig","lat_orig"],
-                        get_target_position=["lon_dest","lat_dest"],
-                        get_source_color=[245,176,65,190], get_target_color=[0,210,255,190],
-                        get_width="ancho", width_scale=1, width_min_pixels=1,
-                        pickable=True, auto_highlight=True
-                    ))
-                    # Geopuntos de origen por alimento (color diferenciado)
-                    for alim in alimentos_unicos:
-                        sub = flujos_top[flujos_top["alimento"]==alim]
-                        orig_a = sub.groupby(
-                            ["municipio_origen","departamento_origen","cod_municipio"], as_index=False
-                        ).agg(lon=("lon_orig","first"), lat=("lat_orig","first"),
-                              toneladas_total=("toneladas_total","sum"),
-                              precio_prom=("precio_prom","mean"))
-                        orig_a = orig_a.dropna(subset=["lon","lat"])
-                        orig_a["tipo_elemento"] = f"Origen — {alim}"
-                        orig_a["detalle_1"] = "Alimento: "    + alim
-                        orig_a["detalle_2"] = "Municipio: "   + orig_a["municipio_origen"].fillna("")
-                        orig_a["detalle_3"] = "Toneladas: "   + orig_a["toneladas_total"].map(formatear_ton)
-                        orig_a["detalle_4"] = "Precio prom.: "+ orig_a["precio_prom"].map(
-                            lambda x: f"$ {x:,.0f}/kg" if pd.notna(x) else "Sin dato")
-                        c = color_map_v.get(alim, [200,200,200])
-                        layers_v.append(pdk.Layer(
-                            "ScatterplotLayer", data=orig_a,
-                            get_position="[lon, lat]", get_radius=4200,
-                            get_fill_color=c + [200], get_line_color=[255,255,255,180],
-                            line_width_min_pixels=1, pickable=True, auto_highlight=True
-                        ))
-                    # Centrales
-                    cent_v = flujos_top.groupby("central_mayorista", as_index=False).agg(
-                        lon=("lon_dest","first"), lat=("lat_dest","first"))
-                    cent_v = cent_v.dropna(subset=["lon","lat"])
-                    cent_v["tipo_elemento"] = "Central mayorista"
-                    cent_v["detalle_1"] = "Central: " + cent_v["central_mayorista"].fillna("")
-                    cent_v["detalle_2"] = cent_v["detalle_3"] = cent_v["detalle_4"] = ""
-                    layers_v.append(pdk.Layer(
-                        "ScatterplotLayer", data=cent_v,
-                        get_position="[lon, lat]", get_radius=13500,
-                        get_fill_color=[0,210,255,190], get_line_color=[170,245,255,255],
-                        line_width_min_pixels=2, pickable=True
-                    ))
-
-                # Internacionales
-                if mostrar_flujos_intl_v and not intl_df_v.empty:
-                    layers_v.append(pdk.Layer(
-                        "ArcLayer", data=intl_df_v,
-                        get_source_position=["lon_orig","lat_orig"],
-                        get_target_position=["lon_dest","lat_dest"],
-                        get_source_color=[0,200,120,130], get_target_color=[0,240,160,130],
-                        get_width="ancho", width_scale=1, width_min_pixels=1,
-                        pickable=True, auto_highlight=True
-                    ))
-                    orig_intl_v = intl_df_v.groupby("pais_origen", as_index=False).agg(
-                        lon=("lon_orig","first"), lat=("lat_orig","first"),
-                        toneladas_total=("toneladas_total","sum")
-                    ).dropna(subset=["lon","lat"])
-                    orig_intl_v["tipo_elemento"] = "Origen internacional"
-                    orig_intl_v["detalle_1"] = "Pais: " + orig_intl_v["pais_origen"].fillna("")
-                    orig_intl_v["detalle_2"] = "Toneladas: " + orig_intl_v["toneladas_total"].map(formatear_ton)
-                    orig_intl_v["detalle_3"] = orig_intl_v["detalle_4"] = ""
-                    layers_v.append(pdk.Layer(
-                        "ScatterplotLayer", data=orig_intl_v,
-                        get_position="[lon, lat]", get_radius=80000,
-                        get_fill_color=[0,200,120,200], get_line_color=[0,255,150,255],
-                        line_width_min_pixels=2, pickable=True
-                    ))
-                    # Centrales internacionales
-                    cent_intl_v = intl_df_v.groupby("central_mayorista", as_index=False).agg(
-                        lon=("lon_dest","first"), lat=("lat_dest","first"))
-                    cent_intl_v = cent_intl_v.dropna(subset=["lon","lat"])
-                    cent_intl_v["tipo_elemento"] = "Central mayorista"
-                    cent_intl_v["detalle_1"] = "Central: " + cent_intl_v["central_mayorista"].fillna("")
-                    cent_intl_v["detalle_2"] = cent_intl_v["detalle_3"] = cent_intl_v["detalle_4"] = ""
-                    layers_v.append(pdk.Layer(
-                        "ScatterplotLayer", data=cent_intl_v,
-                        get_position="[lon, lat]", get_radius=13500,
-                        get_fill_color=[0,210,255,190], get_line_color=[170,245,255,255],
-                        line_width_min_pixels=2, pickable=True
-                    ))
-
-                deck_v = pdk.Deck(
-                    layers=layers_v,
-                    initial_view_state=pdk.ViewState(latitude=4.5, longitude=-74.1, zoom=4.6, pitch=0),
-                    tooltip={
-                        "html": "<b>{tipo_elemento}</b><br/>{detalle_1}<br/>{detalle_2}<br/>{detalle_3}<br/>{detalle_4}",
-                        "style": {"backgroundColor":"rgba(18,22,29,0.95)","color":"#F5F7FA","fontSize":"12px"}
-                    },
-                    map_style="dark",
-                )
-                st.pydeck_chart(deck_v, use_container_width=True)
-
-                # Leyenda
-                ley_items = "".join([
-                    f'<span style="display:inline-flex;align-items:center;gap:4px;margin-right:8px;'
-                    f'font-size:0.78rem;color:#C8D8F0;">'
-                    f'<span style="width:10px;height:10px;border-radius:50%;'
-                    f'background:rgb({c[0]},{c[1]},{c[2]});display:inline-block;"></span>{a}</span>'
-                    for a, c in color_map_v.items()
-                ])
-                if mostrar_flujos_intl_v and not intl_df_v.empty:
-                    ley_items += ('<span style="display:inline-flex;align-items:center;gap:4px;'
-                                  'font-size:0.78rem;color:#C8D8F0;">'
-                                  '<span style="width:10px;height:10px;border-radius:50%;'
-                                  'background:rgb(0,200,120);display:inline-block;"></span>Internacional</span>')
-                st.markdown(f'<div style="margin-top:0.4rem;flex-wrap:wrap;">{ley_items}</div>',
-                            unsafe_allow_html=True)
-
-            with col_ser:
-                st.markdown('<div class="panel-title">Serie mensual</div>', unsafe_allow_html=True)
-                if not serie_v.empty:
-                    fig_v = go.Figure()
-                    for alim in alimentos_unicos:
-                        s = serie_v[serie_v["alimento"] == alim]
-                        c = color_map_v.get(alim, [200,200,200])
-                        cstr = f"rgb({c[0]},{c[1]},{c[2]})"
-                        fig_v.add_trace(go.Bar(
-                            x=s["etiqueta_mes"], y=s["toneladas_total"],
-                            name=alim, marker_color=cstr, opacity=0.75, yaxis="y1",
-                            hovertemplate=f"<b>{alim}</b><br>%{{x}}<br>%{{y:,.0f}} ton<extra></extra>"
-                        ))
-                        s_pr = s[s["precio_prom"].notna()]
-                        if not s_pr.empty:
-                            fig_v.add_trace(go.Scatter(
-                                x=s_pr["etiqueta_mes"], y=s_pr["precio_prom"],
-                                name=f"{alim} $/kg", mode="lines+markers",
-                                line=dict(color=cstr, width=2, dash="dot"),
-                                marker=dict(size=5), yaxis="y2",
-                                hovertemplate=f"<b>{alim}</b><br>%{{x}}<br>${{y:,.0f}}/kg<extra></extra>"
-                            ))
-                    fig_v.update_layout(
-                        template="plotly_dark",
-                        paper_bgcolor="#171A21", plot_bgcolor="#171A21",
-                        margin=dict(l=10,r=10,t=10,b=5), height=500,
-                        legend=dict(orientation="h", y=-0.22, x=0, font=dict(size=9)),
-                        barmode="stack",
-                        xaxis=dict(showgrid=False, tickangle=-45),
-                        yaxis=dict(title="Toneladas", gridcolor="#2B3240"),
-                        yaxis2=dict(title="Precio ($/kg)", overlaying="y", side="right",
-                                    showgrid=False, tickprefix="$", tickformat=",.0f")
-                    )
-                    st.plotly_chart(fig_v, use_container_width=True)
-
-            # ── Tabla ──────────────────────────────────────────
-            st.markdown("---")
-            st.markdown('<div class="panel-title">Ranking de municipios abastecedores por alimento</div>',
-                        unsafe_allow_html=True)
-            if not tabla_v.empty:
-                repr_map = {}
-                if not ton_var.empty and "repr_pct" in ton_var.columns:
-                    repr_map = ton_var.set_index("alimento")[["repr_pct","vs_rubro"]].to_dict("index")
-
-                tc1, tc2 = st.columns([2,1])
-                with tc1:
-                    ord_col = st.selectbox("Ordenar por",
-                        ["Toneladas","Precio prom. ($/kg)","Meses activos"],
-                        index=0, key="var_ord_col", label_visibility="collapsed")
-                with tc2:
-                    ord_dir = st.radio("Dir", ["↓ Mayor","↑ Menor"], index=0,
-                        horizontal=True, key="var_ord_dir", label_visibility="collapsed")
-
-                sort_map = {"Toneladas":"toneladas_total","Precio prom. ($/kg)":"precio_prom","Meses activos":"meses_activos"}
-                tabla_s = tabla_v.sort_values(sort_map[ord_col], ascending=(ord_dir=="↑ Menor")).reset_index(drop=True)
-                tabla_s.insert(0,"Ranking", tabla_s.index+1)
-                tabla_s["Toneladas"]           = tabla_s["toneladas_total"].map("{:,.1f}".format)
-                tabla_s["Precio prom. ($/kg)"] = tabla_s["precio_prom"].map(
-                    lambda x: f"$ {x:,.0f}" if pd.notna(x) else "Sin dato")
-                tabla_s["Meses activos"]       = tabla_s["meses_activos"].astype(int)
-                tabla_s["% sobre rubro"]       = tabla_s["alimento"].map(
-                    lambda a: f"{repr_map[a]['repr_pct']:.1f}%" if a in repr_map and pd.notna(repr_map[a].get("repr_pct")) else "—")
-                tabla_s["vs. prom. rubro"]     = tabla_s["alimento"].map(
-                    lambda a: (f"↓ -${abs(repr_map[a]['vs_rubro']):,.0f}" if pd.notna(repr_map[a].get("vs_rubro")) and repr_map[a]['vs_rubro']<0
-                               else f"↑ +${abs(repr_map[a]['vs_rubro']):,.0f}" if pd.notna(repr_map[a].get("vs_rubro")) and repr_map[a]['vs_rubro']>0
-                               else "—") if a in repr_map else "—")
-                cols_t = ["Ranking","municipio_origen","departamento_origen","alimento",
-                          "Toneladas","% sobre rubro","Precio prom. ($/kg)","vs. prom. rubro","Meses activos"]
-                st.dataframe(
-                    tabla_s[cols_t].rename(columns={
-                        "municipio_origen":"Municipio","departamento_origen":"Departamento","alimento":"Alimento"
-                    }).head(300),
-                    use_container_width=True, hide_index=True, height=380
-                )
-
-            # Agregar internacionales a tabla si existen
-            if not intl_df_v.empty:
-                st.markdown("**Origen internacional por rubro:**")
-                intl_tabla = intl_df_v.groupby(["pais_origen","central_mayorista"], as_index=False).agg(
-                    toneladas_total=("toneladas_total","sum")
-                ).sort_values("toneladas_total", ascending=False)
-                intl_tabla["Toneladas"] = intl_tabla["toneladas_total"].map("{:,.1f}".format)
-                st.dataframe(
-                    intl_tabla[["pais_origen","central_mayorista","Toneladas"]].rename(columns={
-                        "pais_origen":"País de origen","central_mayorista":"Central mayorista"
-                    }),
-                    use_container_width=True, hide_index=True
-                )
-
-            st.markdown("""
-            <div class="method-note">
-                <b>% sobre rubro:</b> participación del alimento en el total del rubro bajo los mismos filtros.
-                <b>vs. prom. rubro:</b> diferencia de precio frente al promedio de todos los alimentos del rubro
-                (↓ negativo = más económico que el promedio).
-            </div>
-            """, unsafe_allow_html=True)
-            st.markdown("""
-            <div style="margin-top:0.8rem;padding-top:0.6rem;border-top:1px solid #2B3240;
-                color:#8FA0B7;font-size:0.8rem;text-align:center;">
-                Fuente: SIPSA · DANE · 2020–2026 | Solo rubros priorizados SARA
-            </div>
-            """, unsafe_allow_html=True)
