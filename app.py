@@ -1,5 +1,6 @@
 import base64
 import json
+import html
 import unicodedata
 from pathlib import Path
 
@@ -2169,52 +2170,242 @@ with tab_minorista:
                     )
 
             # --------------------------
-            # MAPA + RESUMEN
+            # SEMÁFORO + MAPA
             # --------------------------
-            map_col, side_col = st.columns([2.35, 1.0])
+            st.markdown(
+                """
+                <style>
+                    .min-semaforo-wrap {
+                        background:#171A21;
+                        border:1px solid #2B3240;
+                        border-radius:10px;
+                        padding:0.7rem 0.75rem;
+                        height:650px;
+                        overflow-y:auto;
+                    }
+                    .min-semaforo-head {
+                        position:sticky;
+                        top:0;
+                        z-index:2;
+                        background:#171A21;
+                        padding:0 0 0.55rem 0;
+                        margin-bottom:0.2rem;
+                        border-bottom:1px solid #2B3240;
+                    }
+                    .min-semaforo-row {
+                        display:grid;
+                        grid-template-columns:13px minmax(0,1fr) auto;
+                        gap:0.45rem;
+                        align-items:center;
+                        padding:0.46rem 0.46rem;
+                        margin:0.28rem 0;
+                        border-radius:7px;
+                        border:1px solid rgba(255,255,255,0.055);
+                    }
+                    .min-semaforo-dot {
+                        width:10px;
+                        height:10px;
+                        border-radius:50%;
+                        box-shadow:0 0 0 2px rgba(255,255,255,0.08);
+                    }
+                    .min-semaforo-name {
+                        color:#E8EDF5;
+                        font-size:0.78rem;
+                        font-weight:600;
+                        white-space:nowrap;
+                        overflow:hidden;
+                        text-overflow:ellipsis;
+                    }
+                    .min-semaforo-sub {
+                        color:#8FA0B7;
+                        font-size:0.66rem;
+                        margin-top:1px;
+                        white-space:nowrap;
+                        overflow:hidden;
+                        text-overflow:ellipsis;
+                    }
+                    .min-semaforo-price {
+                        color:#F5F7FA;
+                        font-size:0.78rem;
+                        font-weight:700;
+                        text-align:right;
+                    }
+                    .min-map-toolbar {
+                        display:flex;
+                        flex-wrap:wrap;
+                        justify-content:flex-end;
+                        gap:0.38rem;
+                        margin:-0.15rem 0 0.45rem 0;
+                    }
+                    .min-map-chip {
+                        background:#1E2530;
+                        border:1px solid #303949;
+                        border-radius:7px;
+                        padding:0.30rem 0.52rem;
+                        min-width:92px;
+                        text-align:right;
+                    }
+                    .min-map-chip-label {
+                        color:#8FA0B7;
+                        font-size:0.61rem;
+                        line-height:1.05;
+                    }
+                    .min-map-chip-value {
+                        color:#F5F7FA;
+                        font-size:0.80rem;
+                        font-weight:700;
+                        line-height:1.15;
+                        margin-top:2px;
+                    }
+                    .min-legend-compact {
+                        display:flex;
+                        flex-wrap:wrap;
+                        align-items:center;
+                        gap:0.55rem 1rem;
+                        background:#171A21;
+                        border:1px solid #2B3240;
+                        border-radius:9px;
+                        padding:0.55rem 0.75rem;
+                        margin:0.45rem 0 0.95rem 0;
+                    }
+                    .min-legend-title {
+                        color:#F5F7FA;
+                        font-size:0.76rem;
+                        font-weight:700;
+                        margin-right:0.25rem;
+                    }
+                    .min-legend-item {
+                        display:flex;
+                        align-items:center;
+                        gap:0.34rem;
+                        color:#C8D8F0;
+                        font-size:0.70rem;
+                    }
+                    .min-legend-swatch {
+                        width:10px;
+                        height:10px;
+                        border-radius:2px;
+                    }
+                    .min-legend-note {
+                        color:#8FA0B7;
+                        font-size:0.66rem;
+                        flex:1 1 330px;
+                    }
+                </style>
+                """,
+                unsafe_allow_html=True,
+            )
 
+            # Primero se construye una observación única por establecimiento para todo
+            # el periodo filtrado. El precio representativo es la mediana de sus meses.
+            puntos = est_mes.dropna(subset=["latitud", "longitud", "precio"]).copy()
+            puntos = puntos[
+                puntos["latitud"].between(4.3, 4.95)
+                & puntos["longitud"].between(-74.4, -73.9)
+            ]
+
+            if not puntos.empty:
+                puntos_mapa = (
+                    puntos.groupby(
+                        ["establecimiento_id", "establecimiento", "latitud", "longitud", "direccion", "clasificacion_comercio"],
+                        dropna=False,
+                        as_index=False,
+                    )
+                    .agg(
+                        precio=("precio", "median"),
+                        precio_min=("precio_min", "min"),
+                        precio_max=("precio_max", "max"),
+                        meses=("mes_reporte", "nunique"),
+                        registros=("n_registros", "sum"),
+                    )
+                )
+
+                q33 = puntos_mapa["precio"].quantile(0.33)
+                q67 = puntos_mapa["precio"].quantile(0.67)
+
+                def nivel_precio(v):
+                    if v <= q33:
+                        return "Precio bajo", [0, 200, 120, 210], "#00C878", "rgba(0,200,120,0.10)"
+                    if v <= q67:
+                        return "Precio medio", [245, 176, 65, 220], "#F5B041", "rgba(245,176,65,0.10)"
+                    return "Precio alto", [255, 99, 132, 220], "#FF6384", "rgba(255,99,132,0.10)"
+
+                niveles = puntos_mapa["precio"].apply(nivel_precio)
+                puntos_mapa["nivel_precio"] = niveles.apply(lambda x: x[0])
+                puntos_mapa["color"] = niveles.apply(lambda x: x[1])
+                puntos_mapa["color_hex"] = niveles.apply(lambda x: x[2])
+                puntos_mapa["fondo_nivel"] = niveles.apply(lambda x: x[3])
+                puntos_mapa["precio_fmt"] = puntos_mapa["precio"].map(formatear_cop)
+                puntos_mapa["rango_fmt"] = puntos_mapa.apply(
+                    lambda r: f"{formatear_cop(r['precio_min'])} – {formatear_cop(r['precio_max'])}", axis=1
+                )
+            else:
+                puntos_mapa = pd.DataFrame()
+                q33 = np.nan
+                q67 = np.nan
+
+            n_geo = puntos_mapa["establecimiento_id"].nunique() if not puntos_mapa.empty else 0
+            cobertura_geo = (100.0 * n_geo / n_est) if n_est else 0.0
+            n_meses_filtro = est_mes["mes_reporte"].nunique() if not est_mes.empty else 0
+            n_tipos_filtro = fmin["clasificacion_comercio"].nunique() if not fmin.empty else 0
+
+            sem_col, map_col = st.columns([0.92, 2.15], gap="medium")
+
+            # ── Semáforo por establecimiento ───────────────────────────
+            with sem_col:
+                st.markdown('<div class="panel-title">Semáforo por establecimiento</div>', unsafe_allow_html=True)
+                st.caption("Precio mediano del establecimiento · ordenado de mayor a menor")
+
+                if puntos_mapa.empty:
+                    st.info("No hay establecimientos con coordenadas válidas bajo los filtros actuales.")
+                else:
+                    sem = puntos_mapa.sort_values(["precio", "establecimiento"], ascending=[False, True]).copy()
+                    rows_html = []
+                    for _, r in sem.iterrows():
+                        nombre = html.escape(str(r.get("establecimiento") or "Sin nombre"))
+                        comercio = html.escape(str(r.get("clasificacion_comercio") or "Sin clasificación"))
+                        nivel = html.escape(str(r.get("nivel_precio") or ""))
+                        precio_txt = html.escape(str(r.get("precio_fmt") or "—"))
+                        color_hex = r.get("color_hex", "#8FA0B7")
+                        fondo = r.get("fondo_nivel", "rgba(143,160,183,0.08)")
+                        rows_html.append(
+                            f'''<div class="min-semaforo-row" style="background:{fondo};border-left:3px solid {color_hex};">
+                                <span class="min-semaforo-dot" style="background:{color_hex};"></span>
+                                <div style="min-width:0;">
+                                    <div class="min-semaforo-name" title="{nombre}">{nombre}</div>
+                                    <div class="min-semaforo-sub" title="{comercio}">{comercio} · {nivel}</div>
+                                </div>
+                                <div class="min-semaforo-price">{precio_txt}</div>
+                            </div>'''
+                        )
+
+                    st.markdown(
+                        f'''<div class="min-semaforo-wrap">
+                            <div class="min-semaforo-head">
+                                <div style="color:#8FA0B7;font-size:0.67rem;">{len(sem):,} establecimientos visibles</div>
+                            </div>
+                            {''.join(rows_html)}
+                        </div>''',
+                        unsafe_allow_html=True,
+                    )
+
+            # ── Mapa ───────────────────────────────────────────────────
             with map_col:
                 st.markdown('<div class="panel-title">Mapa de precios minoristas por establecimiento</div>', unsafe_allow_html=True)
-                puntos = est_mes.dropna(subset=["latitud", "longitud", "precio"]).copy()
-                puntos = puntos[
-                    puntos["latitud"].between(4.3, 4.95)
-                    & puntos["longitud"].between(-74.4, -73.9)
-                ]
 
-                if not puntos.empty:
-                    # Un punto por establecimiento para el periodo seleccionado.
-                    puntos_mapa = (
-                        puntos.groupby(
-                            ["establecimiento_id", "establecimiento", "latitud", "longitud", "direccion", "clasificacion_comercio"],
-                            dropna=False,
-                            as_index=False,
-                        )
-                        .agg(
-                            precio=("precio", "median"),
-                            precio_min=("precio_min", "min"),
-                            precio_max=("precio_max", "max"),
-                            meses=("mes_reporte", "nunique"),
-                            registros=("n_registros", "sum"),
-                        )
-                    )
-                    q33 = puntos_mapa["precio"].quantile(0.33)
-                    q67 = puntos_mapa["precio"].quantile(0.67)
+                # Widgets compactos de cobertura: quedan en la franja superior del mapa,
+                # sin superponerse a la cartografía.
+                st.markdown(
+                    f'''<div class="min-map-toolbar">
+                        <div class="min-map-chip"><div class="min-map-chip-label">Establecimientos filtro</div><div class="min-map-chip-value">{n_est:,}</div></div>
+                        <div class="min-map-chip"><div class="min-map-chip-label">Visibles en mapa</div><div class="min-map-chip-value">{n_geo:,}</div></div>
+                        <div class="min-map-chip"><div class="min-map-chip-label">Cobertura geográfica</div><div class="min-map-chip-value">{cobertura_geo:.1f}%</div></div>
+                        <div class="min-map-chip"><div class="min-map-chip-label">Meses · tipos</div><div class="min-map-chip-value">{n_meses_filtro} · {n_tipos_filtro}</div></div>
+                    </div>''',
+                    unsafe_allow_html=True,
+                )
 
-                    def nivel_precio(v):
-                        if v <= q33:
-                            return "Precio bajo", [0, 200, 120, 210]
-                        if v <= q67:
-                            return "Precio medio", [245, 176, 65, 220]
-                        return "Precio alto", [255, 99, 132, 220]
-
-                    niveles = puntos_mapa["precio"].apply(nivel_precio)
-                    puntos_mapa["nivel_precio"] = niveles.apply(lambda x: x[0])
-                    puntos_mapa["color"] = niveles.apply(lambda x: x[1])
-                    puntos_mapa["precio_fmt"] = puntos_mapa["precio"].map(formatear_cop)
-                    puntos_mapa["rango_fmt"] = puntos_mapa.apply(
-                        lambda r: f"{formatear_cop(r['precio_min'])} – {formatear_cop(r['precio_max'])}", axis=1
-                    )
-
+                if not puntos_mapa.empty:
                     layer = pdk.Layer(
                         "ScatterplotLayer",
                         data=puntos_mapa,
@@ -2249,45 +2440,24 @@ with tab_minorista:
                             map_style="dark",
                         ),
                         use_container_width=True,
-                        height=515,
+                        height=650,
                     )
                 else:
-                    puntos_mapa = pd.DataFrame()
                     st.info("No hay establecimientos con coordenadas válidas bajo los filtros actuales.")
 
-            with side_col:
-                st.markdown('<div class="panel">', unsafe_allow_html=True)
-                st.markdown('<div class="panel-title">Lectura del mapa</div>', unsafe_allow_html=True)
-                st.markdown(
-                    """
-                    <div class="legend-item"><span class="legend-box" style="background:#00C878;"></span>Precio bajo</div>
-                    <div class="legend-item"><span class="legend-box" style="background:#F5B041;"></span>Precio medio</div>
-                    <div class="legend-item"><span class="legend-box" style="background:#FF6384;"></span>Precio alto</div>
-                    <div class="small-note" style="margin-top:0.7rem;">
-                        Los niveles son relativos al producto y periodo filtrados. Se calculan con los
-                        percentiles 33 y 67 de los precios medianos por establecimiento; no representan
-                        umbrales oficiales de precio.
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-                st.markdown('</div>', unsafe_allow_html=True)
-
-                st.markdown('<div class="panel" style="margin-top:0.8rem;">', unsafe_allow_html=True)
-                st.markdown('<div class="panel-title">Cobertura del filtro</div>', unsafe_allow_html=True)
-                n_geo = puntos_mapa["establecimiento_id"].nunique() if not puntos_mapa.empty else 0
-                st.markdown(
-                    f"""
-                    <div class="small-note">
-                        <b>{n_geo:,}</b> establecimientos visibles en mapa<br/>
-                        <b>{est_mes['mes_reporte'].nunique():,}</b> meses incluidos<br/>
-                        <b>{fmin['clasificacion_comercio'].nunique():,}</b> tipos de comercio<br/>
-                        Unidad predominante: <b>{unidad}</b>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-                st.markdown('</div>', unsafe_allow_html=True)
+            # Lectura del mapa compacta, debajo del semáforo y del mapa.
+            q33_txt = formatear_cop(q33) if pd.notna(q33) else "—"
+            q67_txt = formatear_cop(q67) if pd.notna(q67) else "—"
+            st.markdown(
+                f'''<div class="min-legend-compact">
+                    <span class="min-legend-title">Lectura del mapa</span>
+                    <span class="min-legend-item"><span class="min-legend-swatch" style="background:#00C878;"></span>Bajo ≤ P33 ({q33_txt})</span>
+                    <span class="min-legend-item"><span class="min-legend-swatch" style="background:#F5B041;"></span>Medio: P33–P67</span>
+                    <span class="min-legend-item"><span class="min-legend-swatch" style="background:#FF6384;"></span>Alto &gt; P67 ({q67_txt})</span>
+                    <span class="min-legend-note">Los percentiles 33 y 67 se recalculan con los precios medianos por establecimiento del producto y filtros activos; son niveles relativos de comparación, no umbrales oficiales.</span>
+                </div>''',
+                unsafe_allow_html=True,
+            )
 
             # --------------------------
             # GRÁFICOS
