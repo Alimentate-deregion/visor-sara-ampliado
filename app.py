@@ -2335,7 +2335,7 @@ with tab_minorista:
                     obs_df = matriz_long.pivot(index="localidad", columns="clasificacion_comercio", values="observaciones").reindex(index=localidades_orden, columns=tipos_orden)
                     nivel_df = matriz_long.pivot(index="localidad", columns="clasificacion_comercio", values="nivel_txt").reindex(index=localidades_orden, columns=tipos_orden)
 
-                    texto = precio_df.applymap(lambda v: f"$ {v:,.0f}" if pd.notna(v) else "—")
+                    texto = precio_df.map(lambda v: f"$ {v:,.0f}" if pd.notna(v) else "—")
                     custom = np.empty((len(localidades_orden), len(tipos_orden), 4), dtype=object)
                     for i, loc in enumerate(localidades_orden):
                         for j, tipo in enumerate(tipos_orden):
